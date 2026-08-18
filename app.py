@@ -19,7 +19,7 @@ from werkzeug.utils import secure_filename
 BASE_DIR = Path(__file__).resolve().parent
 TRANSFER_DIR = BASE_DIR / "transfers"
 TRANSFER_DIR.mkdir(exist_ok=True)
-BRAND_DIR = BASE_DIR / "Extern"
+BRAND_PATH = BASE_DIR / "static" / "brand" / "camsend-logo.png"
 
 PORT = int(os.environ.get("CAMSEND_PORT", os.environ.get("DATATRANSFER_PORT", "8765")))
 SESSION_TTL_SECONDS = 15 * 60
@@ -143,7 +143,7 @@ session_created = time.time()
 session_lock = threading.Lock()
 session_state = {
     "connected": False, "last_seen": 0.0, "mode": None, "device": None,
-    "device_ip": None,
+    "device_ip": None, "paired": False,
     "receive_dir": str(TRANSFER_DIR),
     "language": "de",
     "ended": False, "offered_files": [], "history": [],
@@ -159,7 +159,7 @@ def new_session() -> str:
         session_created = time.time()
         session_state = {
             "connected": False, "last_seen": 0.0, "mode": None, "device": None,
-            "device_ip": None,
+            "device_ip": None, "paired": False,
             "receive_dir": str(TRANSFER_DIR),
             "language": "de",
             "ended": False, "offered_files": [], "history": [],
@@ -215,9 +215,13 @@ def local_ip() -> str:
 
 
 def session_is_valid(token: str) -> bool:
-    # A QR code remains usable for as long as Windows displays that session.
-    # Pressing "connect another phone" rotates the token and invalidates it.
-    return secrets.compare_digest(token, session_token)
+    with session_lock:
+        if not secrets.compare_digest(token, session_token):
+            return False
+        # An unused QR code expires after 15 minutes. Once a device has paired,
+        # the session stays valid until Windows creates a new one or either side
+        # explicitly ends it.
+        return session_state["paired"] or time.time() - session_created <= SESSION_TTL_SECONDS
 
 
 def tr(key: str) -> str:
@@ -294,7 +298,7 @@ def index():
 
 @app.get("/brand/logo.png")
 def brand_logo():
-    return send_from_directory(BRAND_DIR, "Logo.png", max_age=3600)
+    return send_from_directory(BRAND_PATH.parent, BRAND_PATH.name, max_age=3600)
 
 
 @app.get("/qr.png")
@@ -323,6 +327,7 @@ def connect(token: str):
         touch_session()
         session_state["device_ip"] = request.remote_addr
         session_state["device"] = request.headers.get("User-Agent", "Smartphone")[:160]
+        session_state["paired"] = True
         mode = session_state["mode"]
         language = session_state["language"]
     if mode is None:
@@ -347,7 +352,15 @@ def session_status(token: str):
         active = session_state["connected"] and time.time() - session_state["last_seen"] < HEARTBEAT_TIMEOUT_SECONDS
         if not active:
             session_state["connected"] = False
-        return {**session_state, "connected": active}
+        return {
+            "connected": active,
+            "mode": session_state["mode"],
+            "ended": session_state["ended"],
+            "language": session_state["language"],
+            "offered_files": list(session_state["offered_files"]),
+            "history": [dict(item) for item in session_state["history"]],
+            "transfer": dict(session_state["transfer"]),
+        }
 
 
 @app.post("/api/mode/<token>/<mode>")

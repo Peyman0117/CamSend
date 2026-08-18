@@ -161,7 +161,7 @@ class CamSendWindow:
         root.protocol("WM_DELETE_WINDOW", self.close)
 
     def _load_brand_images(self):
-        logo_path = transfer.BRAND_DIR / "Logo.png"
+        logo_path = transfer.BRAND_PATH
         if not logo_path.exists():
             return None, None
         source = Image.open(logo_path).convert("RGB")
@@ -385,8 +385,37 @@ class CamSendWindow:
         self.percent.set("")
         tk.Label(self.body, text=self.tr("history"), bg=PANEL, fg=MUTED,
                  font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(8, 3))
-        self.history_frame = tk.Frame(self.body, bg=SOFT, highlightbackground=BORDER, highlightthickness=1)
-        self.history_frame.pack(fill="both", expand=True)
+        history_shell = tk.Frame(
+            self.body, bg=SOFT, height=116,
+            highlightbackground=BORDER, highlightthickness=1,
+        )
+        history_shell.pack(fill="x")
+        history_shell.pack_propagate(False)
+        self.history_canvas = tk.Canvas(
+            history_shell, bg=SOFT, bd=0, highlightthickness=0,
+            yscrollincrement=24,
+        )
+        history_scrollbar = tk.Scrollbar(
+            history_shell, orient="vertical", command=self.history_canvas.yview,
+            width=10, relief="flat", bd=0, highlightthickness=0,
+            troughcolor=SOFT, bg="#c5d5e5", activebackground=BLUE,
+        )
+        self.history_canvas.configure(yscrollcommand=history_scrollbar.set)
+        history_scrollbar.pack(side="right", fill="y")
+        self.history_canvas.pack(side="left", fill="both", expand=True)
+        self.history_frame = tk.Frame(self.history_canvas, bg=SOFT)
+        self.history_window = self.history_canvas.create_window(
+            (0, 0), window=self.history_frame, anchor="nw",
+        )
+        self.history_frame.bind(
+            "<Configure>",
+            lambda _event: self.history_canvas.configure(scrollregion=self.history_canvas.bbox("all")),
+        )
+        self.history_canvas.bind(
+            "<Configure>",
+            lambda event: self.history_canvas.itemconfigure(self.history_window, width=event.width),
+        )
+        self.history_canvas.bind("<MouseWheel>", self.scroll_history)
         actions = tk.Frame(self.body, bg=PANEL)
         actions.pack(fill="x", pady=(10, 0))
         if mode == "send":
@@ -491,18 +520,32 @@ class CamSendWindow:
         canvas.configure(cursor="hand2")
 
     def new_transfer(self):
+        if transfer.session_state.get("mode") == "send":
+            # Keep the completed state and the plus button intact while the
+            # native file dialog is open. Cancel must be a true no-op.
+            if not self.send():
+                return False
+            with transfer.session_lock:
+                transfer.session_state["transfer"] = {
+                    "active": False, "name": "", "done": 0, "total": 0, "direction": ""
+                }
+            self.current_progress = 0
+            self.display_progress = 0
+            self.percent.set("")
+            self.filename.set(self.tr("status_accept"))
+            self.draw_transfer_scene()
+            return True
         with transfer.session_lock:
             transfer.session_state["transfer"] = {
                 "active": False, "name": "", "done": 0, "total": 0, "direction": ""
             }
-        if transfer.session_state.get("mode") == "send":
-            self.send()
-        else:
-            self.show_progress(self.tr("receiving"), "")
+        self.show_progress(self.tr("receiving"), "")
+        return True
 
     def switch_direction(self):
         with transfer.session_lock:
             old_mode = transfer.session_state.get("mode")
+            old_transfer = dict(transfer.session_state["transfer"])
             new_mode = "receive" if old_mode == "send" else "send"
             transfer.session_state["mode"] = new_mode
             transfer.session_state["transfer"] = {
@@ -512,6 +555,9 @@ class CamSendWindow:
         if not changed:
             with transfer.session_lock:
                 transfer.session_state["mode"] = old_mode
+                transfer.session_state["transfer"] = old_transfer
+            self.current_mode = old_mode
+        return changed
 
     def animate_transfer(self):
         if not self.animation_active:
@@ -552,14 +598,28 @@ class CamSendWindow:
         for child in self.history_frame.winfo_children():
             child.destroy()
         statuses = {"waiting": self.tr("status_waiting"), "transferring": self.tr("status_transferring"), "done": self.tr("status_done")}
-        for item in history[-4:]:
+        for item in history:
             row = tk.Frame(self.history_frame, bg=SOFT, padx=10, pady=6)
             row.pack(fill="x")
-            tk.Label(row, text=item["name"], bg=SOFT, fg=TEXT, anchor="w",
-                     font=("Segoe UI", 9, "bold")).pack(fill="x")
+            name_label = tk.Label(row, text=item["name"], bg=SOFT, fg=TEXT, anchor="w",
+                                  font=("Segoe UI", 9, "bold"))
+            name_label.pack(fill="x")
             color = GREEN if item["status"] == "done" else BLUE
-            tk.Label(row, text=f"{statuses.get(item['status'], item['status'])} · {item['size_text']}",
-                     bg=SOFT, fg=color, anchor="w", font=("Segoe UI", 8)).pack(fill="x")
+            status_label = tk.Label(
+                row, text=f"{statuses.get(item['status'], item['status'])} · {item['size_text']}",
+                bg=SOFT, fg=color, anchor="w", font=("Segoe UI", 8),
+            )
+            status_label.pack(fill="x")
+            for widget in (row, name_label, status_label):
+                widget.bind("<MouseWheel>", self.scroll_history)
+        self.history_frame.update_idletasks()
+        self.history_canvas.configure(scrollregion=self.history_canvas.bbox("all"))
+        self.history_canvas.yview_moveto(1.0)
+
+    def scroll_history(self, event):
+        if event.delta:
+            self.history_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        return "break"
 
     def show_disconnected(self):
         self.view = "disconnected"

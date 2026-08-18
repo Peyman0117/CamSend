@@ -17,11 +17,12 @@ http://<windows-ip>:8765/connect/<token>
 1. Windows erzeugt beim Start einer Verbindung ein kryptografisch zufälliges Token.
    Die lokale IPv4-Adresse wird aus den aktiven Netzwerkverbindungen ermittelt; ein externer IP-Dienst ist nicht erforderlich.
 2. Das Mobilgerät liest die URL per Kamera oder öffnet den kopierten Link im Browser.
-3. Der Server bindet die aktive Sitzung an das verbundene Mobilgerät. Version 1.0.0 erlaubt nur eine gleichzeitig aktive Browserverbindung.
-4. Regelmäßige Heartbeat-Anfragen halten die Verbindung aktiv und melden einen Sitzungsabbruch an den Browser.
-5. **Neuer Transfer** behält Token und Übertragungsrichtung bei. **Richtung wechseln** behält das Token bei und tauscht Sender und Empfänger.
-6. **Neues Gerät verbinden** erzeugt ein neues Token und macht den vorherigen Link ungültig.
-7. **Beenden** markiert die Sitzung als beendet und blockiert weitere Übertragungen mit diesem Token.
+3. Ein unbenutztes Token läuft 15 Minuten nach seiner Erzeugung ab. Nach dem ersten erfolgreichen Pairing bleibt es bis zum Sitzungsende oder einem Tokenwechsel gültig.
+4. Der Server bindet die aktive Sitzung an das verbundene Mobilgerät. Version 1.0.0 erlaubt nur eine gleichzeitig aktive Browserverbindung.
+5. Regelmäßige Heartbeat-Anfragen halten die Verbindungsanzeige aktiv und melden einen Sitzungsabbruch an den Browser.
+6. **Neuer Transfer** behält Token und Übertragungsrichtung bei. **Richtung wechseln** behält das Token bei und tauscht Sender und Empfänger.
+7. **Neues Gerät verbinden** erzeugt ein neues Token und macht den vorherigen Link ungültig.
+8. **Beenden** markiert die Sitzung als beendet und blockiert weitere Übertragungen mit diesem Token.
 
 ### Relevante Endpunkte
 
@@ -65,11 +66,12 @@ http://<windows-ip>:8765/connect/<token>
 1. Windows generates a cryptographically random token when a connection is started.
    The local IPv4 address is determined from the active network connections; no external IP service is required.
 2. The mobile device reads the URL with its camera or opens the copied link in a browser.
-3. The server associates the active session with the connected mobile device. Version 1.0.0 permits only one active browser connection at a time.
-4. Regular heartbeat requests keep the connection active and notify the browser when the session ends.
-5. **New transfer** keeps the token and transfer direction. **Switch direction** keeps the token and swaps sender and receiver.
-6. **Connect new device** generates a new token and invalidates the previous link.
-7. **End** marks the session as ended and blocks further transfers with that token.
+3. An unused token expires 15 minutes after it is generated. After the first successful pairing, it remains valid until the session ends or the token is replaced.
+4. The server associates the active session with the connected mobile device. Version 1.0.0 permits only one active browser connection at a time.
+5. Regular heartbeat requests keep the connection indicator active and notify the browser when the session ends.
+6. **New transfer** keeps the token and transfer direction. **Switch direction** keeps the token and swaps sender and receiver.
+7. **Connect new device** generates a new token and invalidates the previous link.
+8. **End** marks the session as ended and blocks further transfers with that token.
 
 ### Relevant endpoints
 

@@ -52,7 +52,7 @@ Beim ersten Start kann die Windows-Firewall nach einer Freigabe fragen. Der Netz
 6. Für eine weitere Übertragung **Neuer Transfer** wählen oder mit **Richtung wechseln** die Senderichtung ändern.
 7. Mit **Beenden** die Sitzung auf beiden Geräten schließen.
 
-CamSend unterstützt in Version 1.0.0 eine gleichzeitig verbundene Browser-Sitzung. Die Verbindung bleibt aktiv, solange die CamSend-Seite auf dem Mobilgerät geöffnet und erreichbar ist. Über **Neues Gerät verbinden** wird ein neuer QR-Code mit einem neuen Sitzungstoken erzeugt.
+CamSend unterstützt in Version 1.0.0 eine gleichzeitig verbundene Browser-Sitzung. Ein noch nicht verwendeter QR-Code läuft nach 15 Minuten ab. Nach dem ersten erfolgreichen Pairing bleibt die Sitzung bestehen, bis sie beendet oder über **Neues Gerät verbinden** durch einen neuen QR-Code und ein neues Sitzungstoken ersetzt wird. Die Verbindungsanzeige bleibt aktiv, solange die CamSend-Seite auf dem Mobilgerät geöffnet und erreichbar ist.
 
 ### Dateiverarbeitung
 
@@ -95,7 +95,7 @@ Mobile Browser können Webseiten im Hintergrund anhalten. Die CamSend-Seite wäh
 - `windows_app.py` – Windows-Oberfläche und Ablaufsteuerung
 - `app.py` – lokaler Webserver und Übertragungslogik
 - `templates/` – Browseroberfläche
-- `static/` – Gestaltung der Browseroberfläche
+- `static/` – Gestaltung und öffentliche Markenassets der Browseroberfläche
 - `PROTOCOL.md` – Beschreibung des lokalen Protokolls
 - `requirements.txt` – Python-Abhängigkeiten
 
@@ -155,7 +155,7 @@ Windows Firewall may request permission during the first launch. Allow network a
 6. Select **New transfer** to transfer more files or **Switch direction** to change the sender.
 7. Select **End** to close the session on both devices.
 
-CamSend 1.0.0 supports one connected browser session at a time. The connection stays active while the CamSend page remains open and reachable on the mobile device. Selecting **Connect new device** creates a new QR code with a new session token.
+CamSend 1.0.0 supports one connected browser session at a time. An unused QR code expires after 15 minutes. After the first successful pairing, the session remains valid until it is ended or replaced through **Connect new device**, which creates a new QR code and session token. The connection indicator stays active while the CamSend page remains open and reachable on the mobile device.
 
 ### File handling
 
@@ -198,7 +198,7 @@ Mobile browsers may suspend pages in the background. Keep the CamSend page open 
 - `windows_app.py` – Windows interface and workflow control
 - `app.py` – local web server and transfer logic
 - `templates/` – browser interface
-- `static/` – browser interface styling
+- `static/` – browser interface styling and public brand assets
 - `PROTOCOL.md` – local protocol description
 - `requirements.txt` – Python dependencies
 
