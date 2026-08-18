@@ -16,6 +16,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageTk
 from werkzeug.serving import make_server
 
 import app as transfer
+from camsend_version import VERSION
 
 
 BG = "#eaf2fa"
@@ -129,7 +130,7 @@ LANGUAGE_NAMES = {"de": "Deutsch", "en": "English", "tr": "Türkçe", "az": "Az�
 class CamSendWindow:
     def __init__(self, root: tk.Tk):
         self.root = root
-        root.title("CamSend")
+        root.title(f"CamSend {VERSION}")
         root.geometry("480x690")
         root.resizable(False, False)
         root.configure(bg=BG)

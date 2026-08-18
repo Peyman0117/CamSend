@@ -4,29 +4,47 @@ import io
 import ipaddress
 import mimetypes
 import os
+import re
 import secrets
 import socket
+import sys
 import time
 import threading
+import unicodedata
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import qrcode
-from flask import Flask, Response, abort, redirect, render_template, request, send_from_directory, stream_with_context, url_for
-from werkzeug.utils import secure_filename
+from flask import Flask, Response, abort, render_template, request, send_from_directory, stream_with_context
+from werkzeug.utils import secure_filename as ascii_secure_filename
+
+from camsend_version import VERSION
 
 
-BASE_DIR = Path(__file__).resolve().parent
-TRANSFER_DIR = BASE_DIR / "transfers"
-TRANSFER_DIR.mkdir(exist_ok=True)
-BRAND_PATH = BASE_DIR / "static" / "brand" / "camsend-logo.png"
+SOURCE_DIR = Path(__file__).resolve().parent
+RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", SOURCE_DIR))
+IS_FROZEN = bool(getattr(sys, "frozen", False))
+
+if IS_FROZEN:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    DATA_DIR = Path(local_app_data) / "CamSend" if local_app_data else Path.home() / "AppData" / "Local" / "CamSend"
+else:
+    DATA_DIR = SOURCE_DIR
+
+TRANSFER_DIR = DATA_DIR / "transfers"
+TRANSFER_DIR.mkdir(parents=True, exist_ok=True)
+BRAND_PATH = RESOURCE_DIR / "static" / "brand" / "camsend-logo.png"
 
 PORT = int(os.environ.get("CAMSEND_PORT", os.environ.get("DATATRANSFER_PORT", "8765")))
 SESSION_TTL_SECONDS = 15 * 60
 HEARTBEAT_TIMEOUT_SECONDS = 20
 MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=str(RESOURCE_DIR / "templates"),
+    static_folder=str(RESOURCE_DIR / "static"),
+)
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_BYTES
 
 MOBILE_TEXT = {
@@ -48,7 +66,7 @@ MOBILE_EXTRA = {
         "direct_transfer": "Direkte Übertragung", "phone_intro": "Wähle deine Dateien aus. CamSend überträgt sie direkt über dein lokales WLAN.",
         "upload_complete": "Upload abgeschlossen", "label_send": "Senden", "multi_select": "Mehrfachauswahl möglich",
         "label_receive": "Empfangen", "no_files": "Warte auf Dateien von Windows.", "activity": "Aktivität",
-        "local_connection": "Direkte Verbindung im lokalen WLAN", "transfer_complete": "Übertragung abgeschlossen",
+        "local_connection": "Direkte Verbindung im lokalen WLAN", "transfer_complete": "Übertragung abgeschlossen", "transfer_failed": "Übertragung unterbrochen. Bitte erneut versuchen.",
         "download_complete": "Download abgeschlossen", "connection_established": "Verbindung hergestellt",
         "ready": "Bereit", "local_secure": "Lokale Verbindung", "connect_title": "Smartphone verbinden",
         "connect_intro": "Öffne die Kamera deines Smartphones und scanne den QR-Code. Beide Geräte müssen im selben WLAN sein.",
@@ -66,7 +84,7 @@ MOBILE_EXTRA = {
         "direct_transfer": "Direct transfer", "phone_intro": "Choose your files. CamSend transfers them directly over your local Wi-Fi.",
         "upload_complete": "Upload complete", "label_send": "Send", "multi_select": "Multiple selection available",
         "label_receive": "Receive", "no_files": "Waiting for files from Windows.", "activity": "Activity",
-        "local_connection": "Direct connection over local Wi-Fi", "transfer_complete": "Transfer complete",
+        "local_connection": "Direct connection over local Wi-Fi", "transfer_complete": "Transfer complete", "transfer_failed": "Transfer interrupted. Please try again.",
         "download_complete": "Download complete", "connection_established": "Connection established",
         "ready": "Ready", "local_secure": "Local connection", "connect_title": "Connect phone",
         "connect_intro": "Open your phone camera and scan the QR code. Both devices must use the same Wi-Fi.",
@@ -84,7 +102,7 @@ MOBILE_EXTRA = {
         "direct_transfer": "Doğrudan aktarım", "phone_intro": "Dosyalarınızı seçin. CamSend onları yerel Wi-Fi ağınız üzerinden doğrudan aktarır.",
         "upload_complete": "Yükleme tamamlandı", "label_send": "Gönder", "multi_select": "Birden fazla dosya seçilebilir",
         "label_receive": "Al", "no_files": "Windows'tan dosya bekleniyor.", "activity": "Etkinlik",
-        "local_connection": "Yerel Wi-Fi üzerinden doğrudan bağlantı", "transfer_complete": "Aktarım tamamlandı",
+        "local_connection": "Yerel Wi-Fi üzerinden doğrudan bağlantı", "transfer_complete": "Aktarım tamamlandı", "transfer_failed": "Aktarım kesildi. Lütfen tekrar deneyin.",
         "download_complete": "İndirme tamamlandı", "connection_established": "Bağlantı kuruldu",
         "ready": "Hazır", "local_secure": "Yerel bağlantı", "connect_title": "Telefonu bağla",
         "connect_intro": "Telefon kameranızı açın ve QR kodunu tarayın. İki cihaz aynı Wi-Fi ağında olmalıdır.",
@@ -102,7 +120,7 @@ MOBILE_EXTRA = {
         "direct_transfer": "Birbaşa köçürmə", "phone_intro": "Fayllarınızı seçin. CamSend onları yerli Wi-Fi şəbəkəniz üzərindən birbaşa köçürür.",
         "upload_complete": "Yükləmə tamamlandı", "label_send": "Göndər", "multi_select": "Bir neçə fayl seçmək mümkündür",
         "label_receive": "Qəbul et", "no_files": "Windows-dan fayllar gözlənilir.", "activity": "Fəaliyyət",
-        "local_connection": "Yerli Wi-Fi üzərindən birbaşa bağlantı", "transfer_complete": "Köçürmə tamamlandı",
+        "local_connection": "Yerli Wi-Fi üzərindən birbaşa bağlantı", "transfer_complete": "Köçürmə tamamlandı", "transfer_failed": "Köçürmə dayandırıldı. Yenidən cəhd edin.",
         "download_complete": "Endirmə tamamlandı", "connection_established": "Bağlantı quruldu",
         "ready": "Hazır", "local_secure": "Yerli bağlantı", "connect_title": "Telefonu qoş",
         "connect_intro": "Telefon kamerasını açın və QR kodu skan edin. Hər iki cihaz eyni Wi-Fi şəbəkəsində olmalıdır.",
@@ -120,7 +138,7 @@ MOBILE_EXTRA = {
         "direct_transfer": "Прямая передача", "phone_intro": "Выберите файлы. CamSend передаст их напрямую через вашу локальную сеть Wi-Fi.",
         "upload_complete": "Загрузка завершена", "label_send": "Отправить", "multi_select": "Можно выбрать несколько файлов",
         "label_receive": "Получить", "no_files": "Ожидание файлов из Windows.", "activity": "Активность",
-        "local_connection": "Прямое подключение по локальной сети Wi-Fi", "transfer_complete": "Передача завершена",
+        "local_connection": "Прямое подключение по локальной сети Wi-Fi", "transfer_complete": "Передача завершена", "transfer_failed": "Передача прервана. Повторите попытку.",
         "download_complete": "Скачивание завершено", "connection_established": "Соединение установлено",
         "ready": "Готово", "local_secure": "Локальное подключение", "connect_title": "Подключить телефон",
         "connect_intro": "Откройте камеру телефона и отсканируйте QR-код. Оба устройства должны быть в одной сети Wi-Fi.",
@@ -290,6 +308,28 @@ def format_bytes(size: int) -> str:
         value /= 1024
 
 
+def sanitize_filename(value: str) -> str:
+    """Return a Windows-safe filename while preserving international text."""
+    decoded = unicodedata.normalize("NFC", unquote(value or ""))
+    name = decoded.replace("\\", "/").rsplit("/", 1)[-1]
+    name = "".join(
+        "" if character in '<>:"/\\|?*' or ord(character) < 32 else character
+        for character in name
+    )
+    name = re.sub(r"\s+", "_", name)
+    name = re.sub(r"_+", "_", name).strip(" .")
+    if name in {"", ".", ".."}:
+        return ""
+
+    suffix = Path(name).suffix
+    stem = name[:-len(suffix)] if suffix else name
+    reserved = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+    if stem.upper() in reserved:
+        stem = f"_{stem}"
+    maximum_stem = max(1, 240 - len(suffix))
+    return f"{stem[:maximum_stem].rstrip(' .')}{suffix}"
+
+
 @app.get("/")
 def index():
     language = session_state.get("language", "en")
@@ -402,7 +442,7 @@ def switch_direction(token: str):
 @app.post("/upload-file/<token>")
 def upload_file(token: str):
     require_session(token)
-    name = secure_filename(unquote(request.headers.get("X-Filename", "")))
+    name = sanitize_filename(request.headers.get("X-Filename", ""))
     if not name:
         abort(400, tr("error_filename"))
     with session_lock:
@@ -419,13 +459,22 @@ def upload_file(token: str):
         history_item = add_history(target.name, total, "receive", "transferring")
         session_state["transfer"] = {"active": True, "name": target.name, "done": 0, "total": total, "direction": "receive"}
     done = 0
-    with target.open("wb") as output:
-        while chunk := request.stream.read(1024 * 1024):
-            output.write(chunk)
-            done += len(chunk)
+    try:
+        with target.open("wb") as output:
+            while chunk := request.stream.read(1024 * 1024):
+                output.write(chunk)
+                done += len(chunk)
+                with session_lock:
+                    session_state["transfer"]["done"] = done
+                    update_history(history_item["id"], done=done)
+    except Exception:
+        try:
+            target.unlink(missing_ok=True)
+        finally:
             with session_lock:
-                session_state["transfer"]["done"] = done
-                update_history(history_item["id"], done=done)
+                session_state["transfer"] = {"active": False, "name": "", "done": 0, "total": 0, "direction": ""}
+                session_state["history"] = [item for item in session_state["history"] if item["id"] != history_item["id"]]
+        raise
     with session_lock:
         session_state["transfer"]["active"] = False
         update_history(history_item["id"], done=done, status="done")
@@ -435,7 +484,12 @@ def upload_file(token: str):
 @app.get("/download-file/<token>/<path:name>")
 def download_file(token: str, name: str):
     require_session(token)
-    safe_name = secure_filename(name)
+    safe_name = sanitize_filename(name)
+    if not safe_name:
+        abort(404)
+    with session_lock:
+        if safe_name not in session_state["offered_files"]:
+            abort(404)
     path = TRANSFER_DIR / safe_name
     if not path.is_file():
         abort(404)
@@ -450,50 +504,34 @@ def download_file(token: str, name: str):
     @stream_with_context
     def chunks():
         done = 0
-        with path.open("rb") as source:
-            while chunk := source.read(1024 * 1024):
-                yield chunk
-                done += len(chunk)
-                with session_lock:
-                    session_state["transfer"]["done"] = done
-                    update_history(history_item["id"], done=done)
-        with session_lock:
-            session_state["transfer"]["active"] = False
-            update_history(history_item["id"], done=done, status="done")
-            if safe_name in session_state["offered_files"]:
-                session_state["offered_files"].remove(safe_name)
+        completed = total == 0
+        try:
+            with path.open("rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    done += len(chunk)
+                    completed = done >= total
+                    with session_lock:
+                        session_state["transfer"]["done"] = done
+                        update_history(history_item["id"], done=done)
+                    yield chunk
+        finally:
+            with session_lock:
+                session_state["transfer"]["active"] = False
+                if completed:
+                    update_history(history_item["id"], done=done, status="done")
+                    if safe_name in session_state["offered_files"]:
+                        session_state["offered_files"].remove(safe_name)
+                else:
+                    session_state["transfer"]["done"] = 0
+                    update_history(history_item["id"], done=0, status="waiting")
 
+    fallback_name = ascii_secure_filename(safe_name) or "download"
+    encoded_name = quote(safe_name, safe="")
     return Response(chunks(), headers={
         "Content-Length": str(total),
-        "Content-Disposition": f'attachment; filename="{safe_name}"',
+        "Content-Disposition": f'attachment; filename="{fallback_name}"; filename*=UTF-8\'\'{encoded_name}',
         "Content-Type": mimetypes.guess_type(safe_name)[0] or "application/octet-stream",
     })
-
-
-@app.post("/upload/<token>")
-def upload(token: str):
-    require_session(token)
-    uploads = request.files.getlist("files")
-    saved = 0
-    for uploaded in uploads:
-        name = secure_filename(uploaded.filename or "")
-        if not name:
-            continue
-        target = TRANSFER_DIR / name
-        stem, suffix = target.stem, target.suffix
-        counter = 1
-        while target.exists():
-            target = TRANSFER_DIR / f"{stem}-{counter}{suffix}"
-            counter += 1
-        uploaded.save(target)
-        saved += 1
-    return redirect(url_for("connect", token=token, uploaded=saved))
-
-
-@app.get("/download/<token>/<path:name>")
-def download(token: str, name: str):
-    require_session(token)
-    return send_from_directory(TRANSFER_DIR, name, as_attachment=True)
 
 
 @app.errorhandler(400)
