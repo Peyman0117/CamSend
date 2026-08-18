@@ -15,6 +15,7 @@ http://<windows-ip>:8765/connect/<token>
 ### Sitzungsablauf
 
 1. Windows erzeugt beim Start einer Verbindung ein kryptografisch zufälliges Token.
+   Die lokale IPv4-Adresse wird aus den aktiven Netzwerkverbindungen ermittelt; ein externer IP-Dienst ist nicht erforderlich.
 2. Das Mobilgerät liest die URL per Kamera oder öffnet den kopierten Link im Browser.
 3. Der Server bindet die aktive Sitzung an das verbundene Mobilgerät. Version 1.0.0 erlaubt nur eine gleichzeitig aktive Browserverbindung.
 4. Regelmäßige Heartbeat-Anfragen halten die Verbindung aktiv und melden einen Sitzungsabbruch an den Browser.
@@ -62,6 +63,7 @@ http://<windows-ip>:8765/connect/<token>
 ### Session flow
 
 1. Windows generates a cryptographically random token when a connection is started.
+   The local IPv4 address is determined from the active network connections; no external IP service is required.
 2. The mobile device reads the URL with its camera or opens the copied link in a browser.
 3. The server associates the active session with the connected mobile device. Version 1.0.0 permits only one active browser connection at a time.
 4. Regular heartbeat requests keep the connection active and notify the browser when the session ends.

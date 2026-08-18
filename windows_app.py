@@ -45,6 +45,8 @@ WORDS = {
         "copy_link": "Link kopieren", "copied": "Link wurde kopiert",
         "switch": "Richtung wechseln",
         "unknown_file": "Datei", "server_error": "Server konnte nicht gestartet werden",
+        "network_error": "Keine geeignete lokale Netzwerkadresse gefunden. Verbinde den PC mit einem WLAN oder LAN und versuche es erneut.",
+        "retry": "Erneut versuchen",
     },
     "en": {
         "connect": "Connect phone", "scan": "Open Camera and scan the QR code\nBoth devices must use the same Wi-Fi",
@@ -62,6 +64,8 @@ WORDS = {
         "copy_link": "Copy link", "copied": "Link copied",
         "switch": "Switch direction",
         "unknown_file": "File", "server_error": "The server could not be started",
+        "network_error": "No suitable local network address was found. Connect the PC to Wi-Fi or LAN and try again.",
+        "retry": "Try again",
     },
     "tr": {
         "connect": "Telefonu bağla", "scan": "Kamerayı açın ve QR kodunu tarayın\nİki cihaz aynı Wi-Fi ağında olmalı",
@@ -78,6 +82,8 @@ WORDS = {
         "copy_link": "Bağlantıyı kopyala", "copied": "Bağlantı kopyalandı",
         "switch": "Yönü değiştir",
         "unknown_file": "Dosya", "server_error": "Sunucu başlatılamadı",
+        "network_error": "Uygun bir yerel ağ adresi bulunamadı. Bilgisayarı Wi-Fi veya LAN'a bağlayıp yeniden deneyin.",
+        "retry": "Yeniden dene",
     },
     "az": {
         "connect": "Telefonu qoş", "scan": "Kameranı açın və QR kodu skan edin\nHər iki cihaz eyni Wi-Fi şəbəkəsində olmalıdır",
@@ -94,6 +100,8 @@ WORDS = {
         "copy_link": "Linki kopyala", "copied": "Link kopyalandı",
         "switch": "İstiqaməti dəyiş",
         "unknown_file": "Fayl", "server_error": "Serveri başlatmaq mümkün olmadı",
+        "network_error": "Uyğun yerli şəbəkə ünvanı tapılmadı. Kompüteri Wi-Fi və ya LAN-a qoşub yenidən cəhd edin.",
+        "retry": "Yenidən cəhd et",
     },
     "ru": {
         "connect": "Подключить телефон", "scan": "Откройте камеру и отсканируйте QR-код\nОба устройства должны быть в одной сети Wi-Fi",
@@ -110,6 +118,8 @@ WORDS = {
         "copy_link": "Копировать ссылку", "copied": "Ссылка скопирована",
         "switch": "Сменить направление",
         "unknown_file": "Файл", "server_error": "Не удалось запустить сервер",
+        "network_error": "Подходящий локальный сетевой адрес не найден. Подключите компьютер к Wi-Fi или LAN и повторите попытку.",
+        "retry": "Повторить",
     },
 }
 
@@ -130,6 +140,7 @@ class CamSendWindow:
         self.server = make_server("0.0.0.0", transfer.PORT, transfer.app, threaded=True)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.qr_photo = None
+        self.connection_url = None
         system_language = (locale.getlocale()[0] or "en").lower()
         prefix = system_language.split("_")[0].split("-")[0]
         self.language = prefix if prefix in WORDS else "en"
@@ -277,7 +288,17 @@ class CamSendWindow:
         self.was_connected = False
         self.clear()
         self.title(self.tr("connect"), self.tr("scan"))
-        image = qrcode.make(transfer.phone_url()).convert("RGB").resize((260, 260), Image.Resampling.NEAREST)
+        try:
+            self.connection_url = transfer.phone_url()
+        except RuntimeError:
+            self.connection_url = None
+            tk.Label(self.body, text="!", bg="#fff2f0", fg="#c53b2c", width=4, height=2,
+                     font=("Segoe UI", 34, "bold")).pack(pady=(42, 22))
+            tk.Label(self.body, text=self.tr("network_error"), bg=PANEL, fg=MUTED,
+                     wraplength=365, justify="center", font=("Segoe UI", 10)).pack(pady=(0, 20))
+            self.button(self.tr("retry"), lambda: self.show_qr(False)).pack(fill="x", padx=62)
+            return
+        image = qrcode.make(self.connection_url).convert("RGB").resize((260, 260), Image.Resampling.NEAREST)
         self.qr_photo = ImageTk.PhotoImage(image)
         qr_frame = tk.Frame(self.body, bg="#ffffff", padx=10, pady=10,
                             highlightbackground=BORDER, highlightthickness=1)
@@ -289,8 +310,10 @@ class CamSendWindow:
         self.button(self.tr("copy_link"), self.copy_link, True).pack(fill="x", padx=62)
 
     def copy_link(self):
+        if not self.connection_url:
+            return
         self.root.clipboard_clear()
-        self.root.clipboard_append(transfer.phone_url())
+        self.root.clipboard_append(self.connection_url)
         self.root.update()
         self.qr_status.configure(text="✓  " + self.tr("copied"))
 

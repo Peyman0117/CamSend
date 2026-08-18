@@ -68,6 +68,8 @@ CamSend überträgt Dateien ausschließlich über das lokale Netzwerk und verwen
 
 Der QR-Code beziehungsweise Verbindungslink enthält die lokale Adresse und das Sitzungstoken. Er sollte nur mit dem gewünschten Gerät geteilt werden. Beim Start einer neuen Verbindung wird das vorherige Token ungültig.
 
+CamSend ermittelt die lokale Netzwerkadresse direkt aus den aktiven Windows-Netzwerkverbindungen und benötigt dafür keinen externen IP-Dienst.
+
 Weitere technische Einzelheiten stehen in [PROTOCOL.md](PROTOCOL.md).
 
 ### Fehlerbehebung
@@ -168,6 +170,8 @@ CamSend 1.0.0 supports one connected browser session at a time. The connection s
 CamSend transfers files only through the local network and does not use cloud storage. Version 1.0.0 uses local HTTP with a random session token, but it does not yet provide TLS or end-to-end encryption. CamSend should therefore be used only on a trusted private network, not on public or shared Wi-Fi.
 
 The QR code or connection link contains the local address and session token. Share it only with the intended device. Starting a new connection invalidates the previous token.
+
+CamSend determines the local network address directly from the active Windows network connections and does not require an external IP service.
 
 For additional technical details, see [PROTOCOL.md](PROTOCOL.md).
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import ipaddress
 import mimetypes
 import os
 import secrets
@@ -44,12 +45,12 @@ MOBILE_TEXT["ru"].update(session_ended="Сеанс завершён", session_en
 
 MOBILE_EXTRA = {
     "de": {
-        "direct_transfer": "Direkte Übertragung", "phone_intro": "Wähle deine Dateien aus. CamSend überträgt sie direkt und sicher über dein WLAN.",
+        "direct_transfer": "Direkte Übertragung", "phone_intro": "Wähle deine Dateien aus. CamSend überträgt sie direkt über dein lokales WLAN.",
         "upload_complete": "Upload abgeschlossen", "label_send": "Senden", "multi_select": "Mehrfachauswahl möglich",
         "label_receive": "Empfangen", "no_files": "Warte auf Dateien von Windows.", "activity": "Aktivität",
         "local_connection": "Direkte Verbindung im lokalen WLAN", "transfer_complete": "Übertragung abgeschlossen",
         "download_complete": "Download abgeschlossen", "connection_established": "Verbindung hergestellt",
-        "ready": "Bereit", "local_secure": "Sicher im lokalen WLAN", "connect_title": "Smartphone verbinden",
+        "ready": "Bereit", "local_secure": "Lokale Verbindung", "connect_title": "Smartphone verbinden",
         "connect_intro": "Öffne die Kamera deines Smartphones und scanne den QR-Code. Beide Geräte müssen im selben WLAN sein.",
         "step_camera": "Kamera öffnen", "step_camera_hint": "Keine zusätzliche App erforderlich",
         "step_scan": "Code scannen", "step_scan_hint": "Die Verbindung öffnet sich automatisch",
@@ -58,15 +59,16 @@ MOBILE_EXTRA = {
         "unknown_type": "Unbekannter Dateityp", "error_invalid": "Diese Verbindung ist abgelaufen oder ungültig.",
         "error_ended": "Diese Sitzung wurde beendet.", "error_in_use": "Mit diesem QR-Code ist bereits ein anderes Smartphone verbunden.",
         "error_mode": "Unbekannter Übertragungsmodus", "error_filename": "Dateiname fehlt", "error_too_large": "Die Datei ist größer als 2 GB.",
+        "error_network": "Keine geeignete lokale Netzwerkadresse gefunden. Verbinde den PC mit einem WLAN oder LAN.",
         "file_label": "DATEI", "qr_alt": "QR-Code zur Verbindung", "error_heading": "Fehler",
     },
     "en": {
-        "direct_transfer": "Direct transfer", "phone_intro": "Choose your files. CamSend transfers them directly and securely over your Wi-Fi.",
+        "direct_transfer": "Direct transfer", "phone_intro": "Choose your files. CamSend transfers them directly over your local Wi-Fi.",
         "upload_complete": "Upload complete", "label_send": "Send", "multi_select": "Multiple selection available",
         "label_receive": "Receive", "no_files": "Waiting for files from Windows.", "activity": "Activity",
         "local_connection": "Direct connection over local Wi-Fi", "transfer_complete": "Transfer complete",
         "download_complete": "Download complete", "connection_established": "Connection established",
-        "ready": "Ready", "local_secure": "Secure on your local Wi-Fi", "connect_title": "Connect phone",
+        "ready": "Ready", "local_secure": "Local connection", "connect_title": "Connect phone",
         "connect_intro": "Open your phone camera and scan the QR code. Both devices must use the same Wi-Fi.",
         "step_camera": "Open camera", "step_camera_hint": "No additional app required",
         "step_scan": "Scan code", "step_scan_hint": "The connection opens automatically",
@@ -75,15 +77,16 @@ MOBILE_EXTRA = {
         "unknown_type": "Unknown file type", "error_invalid": "This connection has expired or is invalid.",
         "error_ended": "This session has ended.", "error_in_use": "Another phone is already connected with this QR code.",
         "error_mode": "Unknown transfer mode", "error_filename": "File name is missing", "error_too_large": "The file is larger than 2 GB.",
+        "error_network": "No suitable local network address was found. Connect the PC to Wi-Fi or LAN.",
         "file_label": "FILE", "qr_alt": "QR code for connection", "error_heading": "Error",
     },
     "tr": {
-        "direct_transfer": "Doğrudan aktarım", "phone_intro": "Dosyalarınızı seçin. CamSend onları Wi-Fi ağınız üzerinden doğrudan ve güvenli biçimde aktarır.",
+        "direct_transfer": "Doğrudan aktarım", "phone_intro": "Dosyalarınızı seçin. CamSend onları yerel Wi-Fi ağınız üzerinden doğrudan aktarır.",
         "upload_complete": "Yükleme tamamlandı", "label_send": "Gönder", "multi_select": "Birden fazla dosya seçilebilir",
         "label_receive": "Al", "no_files": "Windows'tan dosya bekleniyor.", "activity": "Etkinlik",
         "local_connection": "Yerel Wi-Fi üzerinden doğrudan bağlantı", "transfer_complete": "Aktarım tamamlandı",
         "download_complete": "İndirme tamamlandı", "connection_established": "Bağlantı kuruldu",
-        "ready": "Hazır", "local_secure": "Yerel Wi-Fi ağında güvenli", "connect_title": "Telefonu bağla",
+        "ready": "Hazır", "local_secure": "Yerel bağlantı", "connect_title": "Telefonu bağla",
         "connect_intro": "Telefon kameranızı açın ve QR kodunu tarayın. İki cihaz aynı Wi-Fi ağında olmalıdır.",
         "step_camera": "Kamerayı aç", "step_camera_hint": "Ek uygulama gerekmez",
         "step_scan": "Kodu tara", "step_scan_hint": "Bağlantı otomatik olarak açılır",
@@ -92,15 +95,16 @@ MOBILE_EXTRA = {
         "unknown_type": "Bilinmeyen dosya türü", "error_invalid": "Bu bağlantının süresi dolmuş veya bağlantı geçersiz.",
         "error_ended": "Bu oturum sona erdi.", "error_in_use": "Bu QR koduyla başka bir telefon zaten bağlı.",
         "error_mode": "Bilinmeyen aktarım modu", "error_filename": "Dosya adı eksik", "error_too_large": "Dosya 2 GB'tan büyük.",
+        "error_network": "Uygun bir yerel ağ adresi bulunamadı. Bilgisayarı Wi-Fi veya LAN'a bağlayın.",
         "file_label": "DOSYA", "qr_alt": "Bağlantı için QR kodu", "error_heading": "Hata",
     },
     "az": {
-        "direct_transfer": "Birbaşa köçürmə", "phone_intro": "Fayllarınızı seçin. CamSend onları Wi-Fi şəbəkəniz üzərindən birbaşa və təhlükəsiz köçürür.",
+        "direct_transfer": "Birbaşa köçürmə", "phone_intro": "Fayllarınızı seçin. CamSend onları yerli Wi-Fi şəbəkəniz üzərindən birbaşa köçürür.",
         "upload_complete": "Yükləmə tamamlandı", "label_send": "Göndər", "multi_select": "Bir neçə fayl seçmək mümkündür",
         "label_receive": "Qəbul et", "no_files": "Windows-dan fayllar gözlənilir.", "activity": "Fəaliyyət",
         "local_connection": "Yerli Wi-Fi üzərindən birbaşa bağlantı", "transfer_complete": "Köçürmə tamamlandı",
         "download_complete": "Endirmə tamamlandı", "connection_established": "Bağlantı quruldu",
-        "ready": "Hazır", "local_secure": "Yerli Wi-Fi şəbəkəsində təhlükəsiz", "connect_title": "Telefonu qoş",
+        "ready": "Hazır", "local_secure": "Yerli bağlantı", "connect_title": "Telefonu qoş",
         "connect_intro": "Telefon kamerasını açın və QR kodu skan edin. Hər iki cihaz eyni Wi-Fi şəbəkəsində olmalıdır.",
         "step_camera": "Kameranı aç", "step_camera_hint": "Əlavə tətbiq tələb olunmur",
         "step_scan": "Kodu skan et", "step_scan_hint": "Bağlantı avtomatik açılır",
@@ -109,15 +113,16 @@ MOBILE_EXTRA = {
         "unknown_type": "Naməlum fayl növü", "error_invalid": "Bu bağlantının vaxtı bitib və ya etibarsızdır.",
         "error_ended": "Bu sessiya bitib.", "error_in_use": "Bu QR kodla artıq başqa telefon qoşulub.",
         "error_mode": "Naməlum köçürmə rejimi", "error_filename": "Fayl adı yoxdur", "error_too_large": "Fayl 2 GB-dan böyükdür.",
+        "error_network": "Uyğun yerli şəbəkə ünvanı tapılmadı. Kompüteri Wi-Fi və ya LAN-a qoşun.",
         "file_label": "FAYL", "qr_alt": "Bağlantı üçün QR kod", "error_heading": "Xəta",
     },
     "ru": {
-        "direct_transfer": "Прямая передача", "phone_intro": "Выберите файлы. CamSend передаст их напрямую и безопасно через вашу сеть Wi-Fi.",
+        "direct_transfer": "Прямая передача", "phone_intro": "Выберите файлы. CamSend передаст их напрямую через вашу локальную сеть Wi-Fi.",
         "upload_complete": "Загрузка завершена", "label_send": "Отправить", "multi_select": "Можно выбрать несколько файлов",
         "label_receive": "Получить", "no_files": "Ожидание файлов из Windows.", "activity": "Активность",
         "local_connection": "Прямое подключение по локальной сети Wi-Fi", "transfer_complete": "Передача завершена",
         "download_complete": "Скачивание завершено", "connection_established": "Соединение установлено",
-        "ready": "Готово", "local_secure": "Безопасно в локальной сети Wi-Fi", "connect_title": "Подключить телефон",
+        "ready": "Готово", "local_secure": "Локальное подключение", "connect_title": "Подключить телефон",
         "connect_intro": "Откройте камеру телефона и отсканируйте QR-код. Оба устройства должны быть в одной сети Wi-Fi.",
         "step_camera": "Открыть камеру", "step_camera_hint": "Дополнительное приложение не требуется",
         "step_scan": "Сканировать код", "step_scan_hint": "Соединение откроется автоматически",
@@ -126,6 +131,7 @@ MOBILE_EXTRA = {
         "unknown_type": "Неизвестный тип файла", "error_invalid": "Срок действия подключения истёк или оно недействительно.",
         "error_ended": "Этот сеанс завершён.", "error_in_use": "По этому QR-коду уже подключён другой телефон.",
         "error_mode": "Неизвестный режим передачи", "error_filename": "Отсутствует имя файла", "error_too_large": "Размер файла превышает 2 ГБ.",
+        "error_network": "Подходящий локальный сетевой адрес не найден. Подключите компьютер к Wi-Fi или LAN.",
         "file_label": "ФАЙЛ", "qr_alt": "QR-код для подключения", "error_heading": "Ошибка",
     },
 }
@@ -167,14 +173,45 @@ def phone_url() -> str:
 
 
 def local_ip() -> str:
+    candidates: list[str] = []
+
+    def add_candidate(address: str) -> None:
+        try:
+            parsed = ipaddress.ip_address(address)
+        except ValueError:
+            return
+        if not isinstance(parsed, ipaddress.IPv4Address):
+            return
+        if parsed.is_loopback or parsed.is_link_local or parsed.is_multicast or parsed.is_unspecified:
+            return
+        if address not in candidates:
+            candidates.append(address)
+
+    try:
+        for result in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET, socket.SOCK_DGRAM):
+            add_candidate(result[4][0])
+    except OSError:
+        pass
+
+    # UDP connect only asks the local routing table which interface it would use;
+    # it sends no packet. TEST-NET is reserved for documentation and is not an
+    # external availability dependency.
+    route_address = None
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.connect(("8.8.8.8", 80))
-        return sock.getsockname()[0]
+        sock.connect(("192.0.2.1", 9))
+        route_address = sock.getsockname()[0]
+        add_candidate(route_address)
     except OSError:
-        return "127.0.0.1"
+        pass
     finally:
         sock.close()
+
+    if route_address in candidates:
+        return route_address
+    if candidates:
+        return candidates[0]
+    raise RuntimeError("No usable local IPv4 address was found")
 
 
 def session_is_valid(token: str) -> bool:
@@ -262,7 +299,11 @@ def brand_logo():
 
 @app.get("/qr.png")
 def qr_code():
-    image = qrcode.make(phone_url())
+    try:
+        url = phone_url()
+    except RuntimeError:
+        abort(503, tr("error_network"))
+    image = qrcode.make(url)
     output = io.BytesIO()
     image.save(output, format="PNG")
     output.seek(0)
@@ -447,6 +488,7 @@ def download(token: str, name: str):
 @app.errorhandler(409)
 @app.errorhandler(410)
 @app.errorhandler(413)
+@app.errorhandler(503)
 def localized_error(error):
     language = session_state.get("language", "en")
     message = tr("error_too_large") if error.code == 413 else str(error.description)
@@ -457,5 +499,8 @@ def localized_error(error):
 
 if __name__ == "__main__":
     print(f"CamSend läuft: http://localhost:{PORT}")
-    print(f"Smartphone-Adresse: {phone_url()}")
+    try:
+        print(f"Smartphone-Adresse: {phone_url()}")
+    except RuntimeError:
+        print("Smartphone-Adresse nicht verfügbar: PC mit WLAN oder LAN verbinden.")
     app.run(host="0.0.0.0", port=PORT, debug=False)
