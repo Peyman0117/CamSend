@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CamSend – {{ t.connected }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="phone-page">
+  <main class="app-shell phone-shell waiting-shell">
+    <header class="app-header">
+      <div class="brand-mark">
+        <img src="{{ url_for('brand_logo') }}" alt="CamSend">
+      </div>
+      <span class="status-pill connected"><i></i> {{ t.connected }}</span>
+    </header>
+    <section class="waiting-content">
+      <div class="device-orbit" aria-hidden="true">
+        <div class="device-screen"><span></span></div>
+        <i></i><i></i><i></i>
+      </div>
+      <p class="eyebrow">{{ t.connection_established }}</p>
+      <h1>{{ t.pc }}</h1>
+      <p>{{ t.choose_pc }}</p>
+      <div class="waiting-indicator"><span></span>{{ t.auto }}</div>
+    </section>
+    <footer class="security-line"><span>✓</span> {{ t.local_connection }}</footer>
+  </main>
+  <script>
+    const statusUrl = {{ url_for('session_status', token=token)|tojson }};
+    const initialLanguage = {{ language|tojson }};
+    const endedTitle = {{ t.session_ended|tojson }};
+    const endedHint = {{ t.session_ended_hint|tojson }};
+    async function checkMode() {
+      try {
+        const heartbeat = await fetch({{ url_for('heartbeat', token=token)|tojson }}, {method: 'POST'});
+        if (heartbeat.status === 410) {
+          document.body.innerHTML = `<main class="card desktop"><p class="eyebrow">CamSend</p><h1>${endedTitle}</h1><p class="hint">${endedHint}</p></main>`;
+          return;
+        }
+        const response = await fetch(statusUrl, {cache: 'no-store'});
+        const state = await response.json();
+        if (state.ended) return;
+        if (state.language !== initialLanguage) { location.reload(); return; }
+        if (state.mode) location.reload();
+      } catch (_) {}
+      setTimeout(checkMode, 800);
+    }
+    checkMode();
+  </script>
+</body>
+</html>

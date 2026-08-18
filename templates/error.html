@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CamSend – {{ t.error_heading }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="card desktop">
+    <p class="eyebrow">CamSend</p>
+    <h1>{{ t.error_heading }}</h1>
+    <p class="hint">{{ message }}</p>
+  </main>
+</body>
+</html>

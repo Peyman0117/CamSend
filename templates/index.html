@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CamSend</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="app-shell desktop-shell">
+    <header class="app-header">
+      <a class="brand-mark brand-mark-large" href="/" aria-label="CamSend">
+        <img src="{{ url_for('brand_logo') }}" alt="CamSend">
+      </a>
+      <span class="status-pill"><i></i> {{ t.ready }}</span>
+    </header>
+    <section class="hero desktop-hero">
+      <p class="eyebrow">{{ t.local_secure }}</p>
+      <h1>{{ t.connect_title }}</h1>
+      <p>{{ t.connect_intro }}</p>
+    </section>
+    <section class="connect-panel">
+      <div class="qr-frame">
+        <img class="qr" src="{{ url_for('qr_code') }}" alt="{{ t.qr_alt }}">
+      </div>
+      <div class="connect-steps">
+        <div><span>1</span><p><strong>{{ t.step_camera }}</strong><small>{{ t.step_camera_hint }}</small></p></div>
+        <div><span>2</span><p><strong>{{ t.step_scan }}</strong><small>{{ t.step_scan_hint }}</small></p></div>
+        <div><span>3</span><p><strong>{{ t.step_transfer }}</strong><small>{{ t.step_transfer_hint }}</small></p></div>
+      </div>
+    </section>
+    <footer class="privacy-note">
+      <span aria-hidden="true">⌁</span>
+      <p><strong>{{ t.privacy_title }}</strong><br>{{ t.privacy_hint }}</p>
+    </footer>
+  </main>
+</body>
+</html>
