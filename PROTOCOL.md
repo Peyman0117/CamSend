@@ -19,6 +19,7 @@ http://<windows-ip>:8765/connect/<token>
 2. Das Mobilgerät liest die URL per Kamera oder öffnet den kopierten Link im Browser.
 3. Ein unbenutztes Token läuft 15 Minuten nach seiner Erzeugung ab. Nach dem ersten erfolgreichen Pairing bleibt es bis zum Sitzungsende oder einem Tokenwechsel gültig.
 4. Der Server bindet die aktive Sitzung an das verbundene Mobilgerät. Version 1.0.0 erlaubt nur eine gleichzeitig aktive Browserverbindung.
+   Beim Pairing erhält der Browser ein zufälliges, HttpOnly-Gerätecookie; alle weiteren Endpunkte verlangen Token **und** Cookie. Ein anderes Gerät kann eine gekoppelte Sitzung nicht übernehmen – dafür **Neues Gerät verbinden** verwenden. QR-Code und Desktop-Seite (`/`, `/qr.png`) werden nur an den PC selbst (Loopback) ausgeliefert.
 5. Regelmäßige Heartbeat-Anfragen halten die Verbindungsanzeige aktiv und melden einen Sitzungsabbruch an den Browser.
 6. **Neuer Transfer** behält Token und Übertragungsrichtung bei. **Richtung wechseln** behält das Token bei und tauscht Sender und Empfänger.
 7. **Neues Gerät verbinden** erzeugt ein neues Token und macht den vorherigen Link ungültig.
@@ -68,6 +69,7 @@ http://<windows-ip>:8765/connect/<token>
 2. The mobile device reads the URL with its camera or opens the copied link in a browser.
 3. An unused token expires 15 minutes after it is generated. After the first successful pairing, it remains valid until the session ends or the token is replaced.
 4. The server associates the active session with the connected mobile device. Version 1.0.0 permits only one active browser connection at a time.
+   On pairing, the browser receives a random HttpOnly device cookie; every further endpoint requires both the token **and** the cookie. Another device cannot take over a paired session – use **Connect new device** instead. The QR code and desktop page (`/`, `/qr.png`) are served to the PC itself (loopback) only.
 5. Regular heartbeat requests keep the connection indicator active and notify the browser when the session ends.
 6. **New transfer** keeps the token and transfer direction. **Switch direction** keeps the token and swaps sender and receiver.
 7. **Connect new device** generates a new token and invalidates the previous link.

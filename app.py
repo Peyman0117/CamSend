@@ -15,7 +15,7 @@ from pathlib import Path
 from urllib.parse import quote, unquote
 
 import qrcode
-from flask import Flask, Response, abort, render_template, request, send_from_directory, stream_with_context
+from flask import Flask, Response, abort, make_response, render_template, request, send_from_directory, stream_with_context
 from werkzeug.utils import secure_filename as ascii_secure_filename
 
 from camsend_version import VERSION
@@ -39,6 +39,7 @@ PORT = int(os.environ.get("CAMSEND_PORT", os.environ.get("DATATRANSFER_PORT", "8
 SESSION_TTL_SECONDS = 15 * 60
 HEARTBEAT_TIMEOUT_SECONDS = 20
 MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
+DEVICE_COOKIE = "camsend_device"
 
 app = Flask(
     __name__,
@@ -161,7 +162,7 @@ session_created = time.time()
 session_lock = threading.Lock()
 session_state = {
     "connected": False, "last_seen": 0.0, "mode": None, "device": None,
-    "device_ip": None, "paired": False,
+    "device_ip": None, "device_key": None, "paired": False,
     "receive_dir": str(TRANSFER_DIR),
     "language": "de",
     "ended": False, "offered_files": [], "history": [],
@@ -177,7 +178,7 @@ def new_session() -> str:
         session_created = time.time()
         session_state = {
             "connected": False, "last_seen": 0.0, "mode": None, "device": None,
-            "device_ip": None, "paired": False,
+            "device_ip": None, "device_key": None, "paired": False,
             "receive_dir": str(TRANSFER_DIR),
             "language": "de",
             "ended": False, "offered_files": [], "history": [],
@@ -234,7 +235,9 @@ def local_ip() -> str:
 
 def session_is_valid(token: str) -> bool:
     with session_lock:
-        if not secrets.compare_digest(token, session_token):
+        # Compare bytes: compare_digest raises TypeError for non-ASCII str input,
+        # which turned a garbage token in the URL into a 500 instead of a 403.
+        if not secrets.compare_digest(token.encode("utf-8"), session_token.encode("utf-8")):
             return False
         # An unused QR code expires after 15 minutes. Once a device has paired,
         # the session stays valid until Windows creates a new one or either side
@@ -247,8 +250,31 @@ def tr(key: str) -> str:
     return MOBILE_TEXT.get(language, MOBILE_TEXT["en"])[key]
 
 
+def request_has_device_key() -> bool:
+    """True if the request carries the cookie issued to the paired browser.
+
+    Caller must hold session_lock.
+    """
+    expected = session_state["device_key"]
+    supplied = request.cookies.get(DEVICE_COOKIE, "")
+    return bool(expected) and secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+
+
+def is_loopback_request() -> bool:
+    try:
+        return ipaddress.ip_address(request.remote_addr or "").is_loopback
+    except ValueError:
+        return False
+
+
 def require_session(token: str, allow_ended: bool = False) -> None:
     if not session_is_valid(token):
+        abort(403, tr("error_invalid"))
+    # The token alone is not enough after pairing: it travels in the QR code and in
+    # plain-HTTP URLs. Every API call must also come from the browser that paired.
+    with session_lock:
+        paired_device = request_has_device_key()
+    if not paired_device:
         abort(403, tr("error_invalid"))
     if session_state["ended"] and not allow_ended:
         abort(410, tr("error_ended"))
@@ -332,6 +358,10 @@ def sanitize_filename(value: str) -> str:
 
 @app.get("/")
 def index():
+    # The desktop page embeds the QR code, i.e. the live session token. The server
+    # listens on 0.0.0.0, so without this check any device on the Wi-Fi could read it.
+    if not is_loopback_request():
+        abort(404)
     language = session_state.get("language", "en")
     return render_template("index.html", language=language, t=MOBILE_TEXT[language])
 
@@ -343,6 +373,8 @@ def brand_logo():
 
 @app.get("/qr.png")
 def qr_code():
+    if not is_loopback_request():
+        abort(404)
     try:
         url = phone_url()
     except RuntimeError:
@@ -356,14 +388,27 @@ def qr_code():
 
 @app.get("/connect/<token>")
 def connect(token: str):
-    require_session(token, allow_ended=True)
+    # /connect is the pairing step, so it only checks the token here; the device
+    # check below decides who may pair.
+    if not session_is_valid(token):
+        abort(403, tr("error_invalid"))
     with session_lock:
+        known_device = request_has_device_key()
         if session_state["ended"]:
+            if not known_device:
+                abort(403, tr("error_invalid"))
             language = session_state["language"]
             return render_template("ended.html", language=language, t=MOBILE_TEXT[language]), 410
-        active = session_state["connected"] and time.time() - session_state["last_seen"] < HEARTBEAT_TIMEOUT_SECONDS
-        if active and session_state["device_ip"] not in {None, request.remote_addr}:
+        # Once paired, the session belongs to that browser (cookie). A second browser
+        # on the same address (e.g. QR opened in an in-app browser, then in Chrome)
+        # may re-pair; any other device is refused for the rest of the session, even
+        # if the phone went quiet. Windows offers "Connect another phone" for that.
+        if session_state["paired"] and not known_device and session_state["device_ip"] != request.remote_addr:
             abort(409, tr("error_in_use"))
+        if not known_device:
+            # A new key also locks out a previously paired browser on the same address.
+            session_state["device_key"] = secrets.token_urlsafe(24)
+        device_key = session_state["device_key"]
         touch_session()
         session_state["device_ip"] = request.remote_addr
         session_state["device"] = request.headers.get("User-Agent", "Smartphone")[:160]
@@ -371,8 +416,14 @@ def connect(token: str):
         mode = session_state["mode"]
         language = session_state["language"]
     if mode is None:
-        return render_template("waiting.html", token=token, language=language, t=MOBILE_TEXT[language])
-    return render_template("phone.html", token=token, files=session_file_details(), mode=mode, language=language, t=MOBILE_TEXT[language])
+        page = render_template("waiting.html", token=token, language=language, t=MOBILE_TEXT[language])
+    else:
+        page = render_template("phone.html", token=token, files=session_file_details(), mode=mode, language=language, t=MOBILE_TEXT[language])
+    response = make_response(page)
+    # Lax (not Strict): the cookie must still be sent when the phone reopens the
+    # link from the camera app, which is a cross-site top-level navigation.
+    response.set_cookie(DEVICE_COOKIE, device_key, httponly=True, samesite="Lax", path="/")
+    return response
 
 
 @app.post("/api/heartbeat/<token>")
@@ -484,8 +535,13 @@ def upload_file(token: str):
 @app.get("/download-file/<token>/<path:name>")
 def download_file(token: str, name: str):
     require_session(token)
-    safe_name = sanitize_filename(name)
-    if not safe_name:
+    # Werkzeug has already URL-decoded the path segment. Windows offers files under
+    # their real names (spaces, "%", "__" ...), so the name must match the offered
+    # list exactly; re-sanitizing or decoding it again would break those downloads.
+    # The exact membership check is the access control: only names Windows put
+    # into the list (plain file names inside TRANSFER_DIR) can ever be served.
+    safe_name = name
+    if not safe_name or Path(safe_name).name != safe_name or "\\" in safe_name:
         abort(404)
     with session_lock:
         if safe_name not in session_state["offered_files"]:

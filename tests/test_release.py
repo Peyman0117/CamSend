@@ -28,8 +28,9 @@ class CamSendReleaseTests(unittest.TestCase):
         app.new_session()
         self.temp_directory.cleanup()
 
-    def connect(self, address: str = "192.168.10.20"):
-        return self.client.get(
+    def connect(self, address: str = "192.168.10.20", client=None):
+        # Each test client has its own cookie jar, i.e. it acts as a separate browser.
+        return (client or self.client).get(
             f"/connect/{self.token}",
             environ_overrides={"REMOTE_ADDR": address},
         )
@@ -60,8 +61,59 @@ class CamSendReleaseTests(unittest.TestCase):
 
     def test_only_one_active_browser_address_is_allowed(self) -> None:
         self.assertEqual(self.connect("192.168.10.20").status_code, 200)
-        second = self.connect("192.168.10.21")
+        second = self.connect("192.168.10.21", client=app.app.test_client())
         self.assertEqual(second.status_code, 409)
+
+    def test_paired_session_cannot_be_taken_over_by_another_device(self) -> None:
+        self.assertEqual(self.connect("192.168.10.20").status_code, 200)
+        intruder = app.app.test_client()
+        environ = {"REMOTE_ADDR": "192.168.10.66"}
+        # Knowing the token is not enough for any session endpoint.
+        self.assertEqual(intruder.post(f"/api/heartbeat/{self.token}", environ_overrides=environ).status_code, 403)
+        self.assertEqual(intruder.get(f"/api/session/{self.token}", environ_overrides=environ).status_code, 403)
+        self.assertEqual(intruder.post(f"/api/switch/{self.token}", environ_overrides=environ).status_code, 403)
+        upload = intruder.post(
+            f"/upload-file/{self.token}", data=b"x", headers={"X-Filename": "x.txt"}, environ_overrides=environ
+        )
+        self.assertEqual(upload.status_code, 403)
+        self.assertFalse((app.TRANSFER_DIR / "x.txt").exists())
+        self.assertEqual(intruder.post(f"/api/end/{self.token}", environ_overrides=environ).status_code, 403)
+        self.assertFalse(app.session_state["ended"])
+        # Not even after the paired phone has been silent past the heartbeat timeout.
+        with patch("app.time.time", return_value=app.session_state["last_seen"] + app.HEARTBEAT_TIMEOUT_SECONDS + 1):
+            self.assertEqual(self.connect("192.168.10.66", client=intruder).status_code, 409)
+        self.assertEqual(app.session_state["device_ip"], "192.168.10.20")
+        self.assertEqual(self.client.post(f"/api/heartbeat/{self.token}").status_code, 200)
+
+    def test_second_browser_on_same_address_replaces_the_first(self) -> None:
+        self.assertEqual(self.connect("192.168.10.20").status_code, 200)
+        other_browser = app.app.test_client()
+        self.assertEqual(self.connect("192.168.10.20", client=other_browser).status_code, 200)
+        self.assertEqual(other_browser.post(f"/api/heartbeat/{self.token}").status_code, 200)
+        self.assertEqual(self.client.post(f"/api/heartbeat/{self.token}").status_code, 403)
+
+    def test_garbage_token_is_rejected_without_server_error(self) -> None:
+        self.assertEqual(self.client.get("/connect/%C3%A4").status_code, 403)
+        self.assertEqual(self.client.post("/api/heartbeat/%C3%A4").status_code, 403)
+
+    def test_qr_code_and_desktop_page_are_local_only(self) -> None:
+        lan = {"REMOTE_ADDR": "192.168.10.66"}
+        self.assertEqual(self.client.get("/", environ_overrides=lan).status_code, 404)
+        self.assertEqual(self.client.get("/qr.png", environ_overrides=lan).status_code, 404)
+        self.assertEqual(self.client.get("/", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).status_code, 200)
+        with patch("app.local_ip", return_value="192.168.10.5"):
+            local_qr = self.client.get("/qr.png", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        self.assertEqual(local_qr.status_code, 200)
+        self.assertEqual(local_qr.mimetype, "image/png")
+
+    def test_phone_page_renders_in_both_directions(self) -> None:
+        for mode in ("receive", "send"):
+            app.session_state["mode"] = mode
+            response = self.connect()
+            self.assertEqual(response.status_code, 200, mode)
+            self.assertIn(b'id="end-session"', response.data)
+        app.session_state["mode"] = "receive"
+        self.assertIn(b'type="file"', self.connect().data)
 
     def test_end_blocks_further_transfers(self) -> None:
         self.assertEqual(self.connect().status_code, 200)
@@ -81,7 +133,7 @@ class CamSendReleaseTests(unittest.TestCase):
             set(response.json),
             {"connected", "mode", "ended", "language", "offered_files", "history", "transfer"},
         )
-        self.assertFalse({"receive_dir", "device_ip", "device", "paired"} & set(response.json))
+        self.assertFalse({"receive_dir", "device_ip", "device", "device_key", "paired"} & set(response.json))
 
     def test_upload_stream_sanitizes_and_deduplicates_names(self) -> None:
         self.assertEqual(self.connect().status_code, 200)
@@ -116,7 +168,11 @@ class CamSendReleaseTests(unittest.TestCase):
         with self.client.application.test_request_context(
             f"/upload-file/{self.token}",
             method="POST",
-            headers={"X-Filename": "partial video.mp4", "Content-Length": "20"},
+            headers={
+                "X-Filename": "partial video.mp4",
+                "Content-Length": "20",
+                "Cookie": f"{app.DEVICE_COOKIE}={app.session_state['device_key']}",
+            },
             input_stream=io.BytesIO(b"partial content"),
         ):
             with patch.object(app.request.stream, "read", side_effect=[b"partial", OSError("disconnected")]):
@@ -142,6 +198,27 @@ class CamSendReleaseTests(unittest.TestCase):
         response.close()
         self.assertNotIn(path.name, app.session_state["offered_files"])
         self.assertEqual(app.session_state["history"][-1]["status"], "done")
+
+    def test_offered_files_download_under_their_original_names(self) -> None:
+        self.assertEqual(self.connect().status_code, 200)
+        names = ["Bericht März 2026.pdf", "a%20b.txt", "double__underscore.txt", "100 % sicher.txt"]
+        for name in names:
+            (app.TRANSFER_DIR / name).write_bytes(name.encode("utf-8"))
+        (app.TRANSFER_DIR / "not offered.txt").write_bytes(b"secret")
+        app.session_state["offered_files"] = list(names)
+        app.session_state["mode"] = "send"
+
+        page = self.connect().data.decode("utf-8")
+        for name in names:
+            href = re.search(r'data-name="%s" href="([^"]+)"' % re.escape(name.replace("&", "&amp;")), page)
+            self.assertIsNotNone(href, name)
+            response = self.client.get(href.group(1).replace("&amp;", "&"))
+            self.assertEqual(response.status_code, 200, name)
+            self.assertEqual(response.data, name.encode("utf-8"))
+            response.close()
+
+        for path in ["not%20offered.txt", "../app.py", "..%5capp.py", "C:not%20offered.txt"]:
+            self.assertEqual(self.client.get(f"/download-file/{self.token}/{path}").status_code, 404, path)
 
     def test_cancelled_download_remains_available_for_retry(self) -> None:
         self.assertEqual(self.connect().status_code, 200)

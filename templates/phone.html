@@ -22,7 +22,8 @@
     {% if request.args.get('uploaded') %}<p class="success"><span>✓</span> {{ t.upload_complete }}.</p>{% endif %}
     {% if mode == 'receive' %}<section class="content-card transfer-card">
       <div class="section-heading"><span class="direction-icon">↗</span><div><p class="section-label">{{ t.label_send }}</p><h2>Smartphone <span>→</span> Windows</h2></div></div>
-      <form action="{{ url_for('upload', token=token) }}" method="post" enctype="multipart/form-data">
+      {# No action on purpose: the submit handler below streams each file to /upload-file/<token>; the old multipart endpoint no longer exists. #}
+      <form>
         <label class="picker"><span class="picker-icon">＋</span><strong>{{ t.select }}</strong><small>{{ t.multi_select }}</small>
           <input type="file" name="files" multiple required>
         </label>
