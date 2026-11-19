@@ -270,6 +270,21 @@ button.secondary { background: #eef3f8; color: #385069; box-shadow: none; }
 .end-session { width: calc(100% - 44px); margin: 6px 22px 0; }
 .new-transfer { width: 100%; }
 
+/* Text & links card (templates/_text_card.html); the form itself uses the grid above. */
+.messages { max-height: 320px; overflow-y: auto; margin: 0 0 14px; padding: 0; list-style: none; }
+.messages > .hint { display: block; padding: 10px 2px; text-align: center; font-size: .82rem; }
+.message { margin-bottom: 10px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-soft); }
+.message.from-pc { border-color: #cfe0ff; background: #eef4ff; }
+.message small { display: block; color: var(--muted); font-size: .7rem; font-weight: 700; }
+.message p { margin: 5px 0 9px; color: var(--navy); font-size: .9rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+.message p a { color: var(--blue); font-weight: 700; text-decoration: underline; }
+.message .copy-text { min-height: 34px; padding: 7px 14px; font-size: .76rem; }
+/* 16px keeps iOS Safari from zooming into the field on focus. */
+.text-form textarea { width: 100%; min-height: 84px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-soft); color: var(--navy); font: inherit; font-size: 16px; resize: vertical; }
+.text-form textarea:focus { outline: 3px solid rgba(20, 107, 255, .2); border-color: var(--blue); }
+.text-status { margin: 0; font-size: .8rem; }
+.text-status:empty { display: none; }
+
 .files { margin: 0; padding: 0; list-style: none; }
 .files li {
   display: flex;

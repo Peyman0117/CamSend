@@ -6,13 +6,13 @@
 
 [Download CamSend for Windows](https://github.com/Peyman0117/CamSend/releases) · [Deutsch](#deutsch) · [English](#english)
 
-> CamSend 1.0.0 uses local HTTP. Use it only on trusted private Wi-Fi or LAN networks.
+> CamSend 1.1.0 uses local HTTP. Use it only on trusted private Wi-Fi or LAN networks.
 
 <a id="deutsch"></a>
 
 ## Deutsch
 
-CamSend Local 1.0.0 überträgt Dateien direkt zwischen einem Windows-PC und einem Smartphone oder Tablet im selben lokalen Netzwerk. Auf dem Mobilgerät muss nichts installiert werden: QR-Code scannen, Browser öffnen und Dateien senden oder empfangen.
+CamSend Local 1.1.0 überträgt Dateien direkt zwischen einem Windows-PC und einem Smartphone oder Tablet im selben lokalen Netzwerk. Auf dem Mobilgerät muss nichts installiert werden: QR-Code scannen, Browser öffnen und Dateien senden oder empfangen.
 
 ### Funktionen
 
@@ -22,6 +22,8 @@ CamSend Local 1.0.0 überträgt Dateien direkt zwischen einem Windows-PC und ein
 - Verbindung per QR-Code oder kopierbarem Link herstellen
 - Fortschritt, Dateityp, Dateigröße, Status und Sitzungsverlauf auf beiden Geräten anzeigen
 - Übertragungsrichtung innerhalb derselben Verbindung wechseln
+- Texte und Links in beide Richtungen teilen – mit **Kopieren** und **Öffnen**
+- Dateien per Rechtsklick im Explorer senden: **Mit CamSend senden**
 - Funktioniert mit iPhone, iPad, Android und anderen modernen Mobilbrowsern
 - Deutsch, Englisch, Türkisch, Aserbaidschanisch und Russisch
 - Keine Cloud, kein Konto und keine verpflichtende Internetverbindung
@@ -30,8 +32,8 @@ CamSend Local 1.0.0 überträgt Dateien direkt zwischen einem Windows-PC und ein
 
 Die geprüften Windows-Pakete werden unter [GitHub Releases](https://github.com/Peyman0117/CamSend/releases) bereitgestellt:
 
-- `CamSend-Setup-1.0.0.exe` – empfohlener Installer mit Startmenü-Eintrag, optionaler Desktop-Verknüpfung und Deinstallation
-- `CamSend-Portable-1.0.0.zip` – portabler Ordner mit `CamSend.exe`
+- `CamSend-Setup-1.1.0.exe` – empfohlener Installer mit Startmenü-Eintrag, optionaler Desktop-Verknüpfung und Deinstallation
+- `CamSend-Portable-1.1.0.zip` – portabler Ordner mit `CamSend.exe`
 
 Für diese Pakete ist keine Python-Installation erforderlich. Vor der Veröffentlichung als stabiler Release müssen die realen Gerätetests aus [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) abgeschlossen sein.
 
@@ -47,7 +49,15 @@ Die Binärdateien sind ohne separates Code-Signing-Zertifikat nicht digital sign
 6. Die Übertragung auf dem empfangenden Gerät bestätigen und den Fortschritt verfolgen.
 7. **Neuer Transfer**, **Richtung wechseln** oder **Beenden** wählen.
 
-Ein noch nicht verwendeter QR-Code läuft nach 15 Minuten ab. Nach dem ersten erfolgreichen Pairing bleibt die Sitzung bestehen, bis sie beendet oder über **Neues Gerät verbinden** durch einen neuen QR-Code ersetzt wird. Version 1.0.0 erlaubt eine aktive Smartphone-Browser-Sitzung gleichzeitig.
+#### Texte und Links teilen
+
+Auf dem Smartphone steht der Bereich **Text & Links** bereit, sobald es verbunden ist. Unter Windows öffnet **Text oder Link senden** (bzw. **Text & Links** während einer Übertragung) dasselbe Fenster. Neue Texte vom Smartphone öffnen das Fenster automatisch. Links (`http`/`https`) lassen sich direkt öffnen, jeder Text kann kopiert werden. Texte bleiben nur im Arbeitsspeicher der laufenden Sitzung (höchstens 50 Einträge, je 10.000 Zeichen).
+
+#### Rechtsklick im Explorer
+
+Der Installer richtet auf Wunsch den Eintrag **Mit CamSend senden** ein. In der portablen Version wird er über das Sprachmenü (Globus-Symbol) → **Im Explorer-Rechtsklick anzeigen** ein- und ausgeschaltet. Unter Windows 11 erscheint er unter **Weitere Optionen anzeigen** (oder Umschalt+F10). Läuft CamSend bereits, wird die Datei an das offene Fenster übergeben; sonst startet CamSend mit der Datei und bietet sie an, sobald ein Smartphone verbunden ist.
+
+Ein noch nicht verwendeter QR-Code läuft nach 15 Minuten ab. Nach dem ersten erfolgreichen Pairing bleibt die Sitzung bestehen, bis sie beendet oder über **Neues Gerät verbinden** durch einen neuen QR-Code ersetzt wird. Version 1.1.0 erlaubt eine aktive Smartphone-Browser-Sitzung gleichzeitig.
 
 ### Dateiverarbeitung
 
@@ -61,7 +71,7 @@ Ein noch nicht verwendeter QR-Code läuft nach 15 Minuten ab. Nach dem ersten er
 
 ### Sicherheit und Datenschutz
 
-CamSend überträgt Dateien ausschließlich über das lokale Netzwerk und verwendet keine Cloud. Version 1.0.0 nutzt lokales HTTP mit einem kryptografisch zufälligen Sitzungstoken, besitzt aber noch keine TLS- oder Ende-zu-Ende-Verschlüsselung.
+CamSend überträgt Dateien ausschließlich über das lokale Netzwerk und verwendet keine Cloud. Version 1.1.0 nutzt lokales HTTP mit einem kryptografisch zufälligen Sitzungstoken, besitzt aber noch keine TLS- oder Ende-zu-Ende-Verschlüsselung.
 
 - Nur in einem vertrauenswürdigen privaten WLAN oder LAN verwenden.
 - Nicht für öffentliche oder gemeinsam genutzte WLAN-Netze empfohlen.
@@ -131,7 +141,7 @@ Der Softwarequellcode steht unter der [Mozilla Public License 2.0](LICENSE). Nam
 
 ## English
 
-CamSend Local 1.0.0 transfers files directly between a Windows PC and a smartphone or tablet on the same local network. Nothing needs to be installed on the mobile device: scan the QR code, open the browser, and send or receive files.
+CamSend Local 1.1.0 transfers files directly between a Windows PC and a smartphone or tablet on the same local network. Nothing needs to be installed on the mobile device: scan the QR code, open the browser, and send or receive files.
 
 ### Features
 
@@ -141,6 +151,8 @@ CamSend Local 1.0.0 transfers files directly between a Windows PC and a smartpho
 - Connect through a QR code or copyable link
 - Show progress, file type, file size, status, and session history on both devices
 - Switch direction without creating a new connection
+- Share texts and links in both directions – with **Copy** and **Open**
+- Send files from the Explorer right-click menu: **Send with CamSend**
 - Works with iPhone, iPad, Android, and other modern mobile browsers
 - German, English, Turkish, Azerbaijani, and Russian
 - No cloud, account, or mandatory internet connection
@@ -149,8 +161,8 @@ CamSend Local 1.0.0 transfers files directly between a Windows PC and a smartpho
 
 Validated Windows packages are published under [GitHub Releases](https://github.com/Peyman0117/CamSend/releases):
 
-- `CamSend-Setup-1.0.0.exe` – recommended installer with Start menu shortcut, optional desktop shortcut, and clean uninstallation
-- `CamSend-Portable-1.0.0.zip` – portable folder containing `CamSend.exe`
+- `CamSend-Setup-1.1.0.exe` – recommended installer with Start menu shortcut, optional desktop shortcut, and clean uninstallation
+- `CamSend-Portable-1.1.0.zip` – portable folder containing `CamSend.exe`
 
 These packages do not require Python. The real-device checks in [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) must pass before a stable release is published.
 
@@ -166,7 +178,15 @@ The binaries are not digitally signed unless a separate code-signing certificate
 6. Accept the transfer on the receiving device and follow its progress.
 7. Select **New transfer**, **Switch direction**, or **End**.
 
-An unused QR code expires after 15 minutes. After the first successful pairing, the session remains valid until it is ended or replaced through **Connect new device**. Version 1.0.0 permits one active smartphone browser session at a time.
+#### Sharing texts and links
+
+Once connected, the phone shows a **Text & links** card. On Windows, **Send text or link** (or **Text & links** during a transfer) opens the same window. New texts from the phone open it automatically. Links (`http`/`https`) can be opened directly and every text can be copied. Texts live only in memory for the running session (at most 50 entries of 10,000 characters each).
+
+#### Explorer right-click menu
+
+The installer can add the **Send with CamSend** entry. In the portable build, toggle it via the language menu (globe icon) → **Show in Explorer right-click menu**. On Windows 11 it appears under **Show more options** (or Shift+F10). If CamSend is already running, the file is handed to the open window; otherwise CamSend starts with the file and offers it as soon as a phone connects.
+
+An unused QR code expires after 15 minutes. After the first successful pairing, the session remains valid until it is ended or replaced through **Connect new device**. Version 1.1.0 permits one active smartphone browser session at a time.
 
 ### File handling
 
@@ -180,7 +200,7 @@ An unused QR code expires after 15 minutes. After the first successful pairing, 
 
 ### Security and privacy
 
-CamSend transfers files only over the local network and does not use cloud storage. Version 1.0.0 uses local HTTP with a cryptographically random session token, but it does not yet provide TLS or end-to-end encryption.
+CamSend transfers files only over the local network and does not use cloud storage. Version 1.1.0 uses local HTTP with a cryptographically random session token, but it does not yet provide TLS or end-to-end encryption.
 
 - Use CamSend only on a trusted private Wi-Fi or LAN.
 - Public or shared Wi-Fi networks are not recommended.

@@ -39,6 +39,7 @@ VersionInfoProductVersion={#MyAppVersion}
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+Name: "contextmenu"; Description: "Add ""Send with CamSend"" to the Explorer right-click menu"; GroupDescription: "Windows integration:"
 
 [Files]
 Source: "..\..\dist\CamSend\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -48,4 +49,11 @@ Name: "{group}\CamSend"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
 Name: "{autodesktop}\CamSend"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
+; The entry lives in HKCU, so it must be written by the signed-in user, not by the
+; elevated installer process (runasoriginaluser). CamSend.exe writes it itself so
+; portable builds and installs share one implementation (shell_integration.py).
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-shell"; Flags: runasoriginaluser runhidden waituntilterminated; Tasks: contextmenu
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch CamSend"; Flags: nowait postinstall skipifsilent runasoriginaluser
+
+[UninstallRun]
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--unregister-shell"; Flags: runhidden waituntilterminated; RunOnceId: "UnregisterExplorerEntry"

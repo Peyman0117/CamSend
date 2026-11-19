@@ -36,7 +36,7 @@ class CamSendReleaseTests(unittest.TestCase):
         )
 
     def test_release_version_and_request_limit(self) -> None:
-        self.assertEqual(VERSION, "1.0.0")
+        self.assertEqual(VERSION, "1.1.0")
         self.assertEqual(app.MAX_FILE_BYTES, 2 * 1024 * 1024 * 1024)
         self.assertEqual(app.app.config["MAX_CONTENT_LENGTH"], app.MAX_FILE_BYTES)
 
@@ -294,6 +294,98 @@ class CamSendReleaseTests(unittest.TestCase):
         self.assertFalse(window.switch_direction())
         self.assertEqual(app.session_state["mode"], "send")
         self.assertEqual(app.session_state["transfer"], previous_transfer)
+
+    # --- 1.1.0: text & link sharing -------------------------------------------------
+
+    def test_texts_flow_in_both_directions(self) -> None:
+        self.assertEqual(self.connect().status_code, 200)
+        sent = self.client.post(f"/api/texts/{self.token}", json={"text": "Hallo\r\nhttps://camsend.app"})
+        self.assertEqual(sent.status_code, 200)
+        self.assertEqual(sent.json["message"]["text"], "Hallo\nhttps://camsend.app")
+        self.assertEqual(sent.json["message"]["from"], "phone")
+
+        with app.session_lock:
+            app.add_message("pc", "Vom PC")
+        listed = self.client.get(f"/api/texts/{self.token}")
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual([item["from"] for item in listed.json["messages"]], ["phone", "pc"])
+        self.assertEqual(set(listed.json["messages"][0]), {"id", "from", "text", "time"})
+
+    def test_texts_reject_empty_too_long_and_foreign_devices(self) -> None:
+        self.assertEqual(self.connect().status_code, 200)
+        url = f"/api/texts/{self.token}"
+        self.assertEqual(self.client.post(url, json={"text": "   "}).json["error"], "text_empty")
+        too_long = self.client.post(url, json={"text": "x" * (app.MAX_TEXT_CHARS + 1)})
+        self.assertEqual((too_long.status_code, too_long.json["error"]), (400, "text_too_long"))
+        self.assertEqual(self.client.post(url, json={"text": 5}).status_code, 400)
+        self.assertEqual(self.client.post(url, data="x" * (app.MAX_JSON_BYTES + 1),
+                                          content_type="application/json").status_code, 413)
+
+        stranger = app.app.test_client()
+        self.assertEqual(stranger.get(url).status_code, 403)
+        self.assertEqual(stranger.post(url, json={"text": "hi"}).status_code, 403)
+        self.assertEqual(app.session_state["messages"], [])
+
+        self.assertEqual(self.client.post(f"/api/end/{self.token}").status_code, 200)
+        self.assertEqual(self.client.post(url, json={"text": "late"}).status_code, 410)
+
+    def test_text_history_is_bounded_and_reset_with_session(self) -> None:
+        with app.session_lock:
+            for number in range(app.MAX_TEXT_MESSAGES + 5):
+                app.add_message("pc", str(number))
+            self.assertEqual(len(app.session_state["messages"]), app.MAX_TEXT_MESSAGES)
+            self.assertEqual(app.session_state["messages"][0]["text"], "5")
+        app.new_session()
+        self.assertEqual(app.session_state["messages"], [])
+
+    def test_phone_pages_include_text_card_without_breaking_upload_form(self) -> None:
+        waiting = self.connect()
+        self.assertIn(b'id="text-form"', waiting.data)
+        app.session_state["mode"] = "receive"
+        page = self.connect().data.decode("utf-8")
+        self.assertIn('class="upload-form"', page)
+        self.assertIn("form.upload-form", page)
+        self.assertIn('id="text-form"', page)
+
+    def test_only_http_links_are_opened_on_windows(self) -> None:
+        self.assertEqual(windows_app.first_url("siehe https://camsend.app/x, danke"), "https://camsend.app/x")
+        self.assertIsNone(windows_app.first_url("javascript:alert(1) file:///C:/Windows"))
+        self.assertIsNone(windows_app.first_url("kein Link"))
+
+    # --- 1.1.0: Explorer hand-off ---------------------------------------------------
+
+    def test_local_offer_requires_loopback_and_instance_key(self) -> None:
+        source = Path(self.temp_directory.name) / "bild.jpg"
+        source.write_bytes(b"jpg")
+        key_path = Path(self.temp_directory.name) / "instance.key"
+        loopback = {"REMOTE_ADDR": "127.0.0.1"}
+        with patch.object(app, "INSTANCE_KEY_PATH", key_path):
+            self.assertEqual(self.client.post("/local/offer", json={"paths": [str(source)]},
+                                              environ_overrides=loopback).status_code, 404)
+            app.enable_local_handoff()
+            try:
+                key = key_path.read_text(encoding="utf-8").split()[1]
+                body = {"paths": [str(source), str(source.with_name("fehlt.jpg")), 7]}
+                self.assertEqual(self.client.post("/local/offer", json=body, headers={"X-CamSend-Key": key},
+                                                  environ_overrides={"REMOTE_ADDR": "192.168.1.5"}).status_code, 404)
+                self.assertEqual(self.client.post("/local/offer", json=body, headers={"X-CamSend-Key": "falsch"},
+                                                  environ_overrides=loopback).status_code, 403)
+                accepted = self.client.post("/local/offer", json=body, headers={"X-CamSend-Key": key},
+                                            environ_overrides=loopback)
+                self.assertEqual(accepted.json, {"ok": True, "accepted": 1})
+                self.assertEqual(app.local_offer_queue.get_nowait(), [str(source)])
+            finally:
+                app.disable_local_handoff()
+            self.assertFalse(key_path.exists())
+
+    def test_hand_off_without_running_instance_starts_normally(self) -> None:
+        with patch.object(app, "INSTANCE_KEY_PATH", Path(self.temp_directory.name) / "missing.key"):
+            self.assertFalse(windows_app.hand_off_to_running_instance(["C:/x.txt"]))
+
+    def test_shell_command_passes_one_file_to_send(self) -> None:
+        import shell_integration
+        self.assertEqual(shell_integration.command_for(r"C:\Apps\CamSend\CamSend.exe"),
+                         r'"C:\Apps\CamSend\CamSend.exe" --send "%1"')
 
 
 if __name__ == "__main__":

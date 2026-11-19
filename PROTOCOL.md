@@ -1,4 +1,4 @@
-# CamSend Protocol v1.0.0
+# CamSend Protocol v1.1.0
 
 [Deutsch](#deutsch) · [English](#english)
 
@@ -18,7 +18,7 @@ http://<windows-ip>:8765/connect/<token>
    Die lokale IPv4-Adresse wird aus den aktiven Netzwerkverbindungen ermittelt; ein externer IP-Dienst ist nicht erforderlich.
 2. Das Mobilgerät liest die URL per Kamera oder öffnet den kopierten Link im Browser.
 3. Ein unbenutztes Token läuft 15 Minuten nach seiner Erzeugung ab. Nach dem ersten erfolgreichen Pairing bleibt es bis zum Sitzungsende oder einem Tokenwechsel gültig.
-4. Der Server bindet die aktive Sitzung an das verbundene Mobilgerät. Version 1.0.0 erlaubt nur eine gleichzeitig aktive Browserverbindung.
+4. Der Server bindet die aktive Sitzung an das verbundene Mobilgerät. Version 1.1.0 erlaubt nur eine gleichzeitig aktive Browserverbindung.
    Beim Pairing erhält der Browser ein zufälliges, HttpOnly-Gerätecookie; alle weiteren Endpunkte verlangen Token **und** Cookie. Ein anderes Gerät kann eine gekoppelte Sitzung nicht übernehmen – dafür **Neues Gerät verbinden** verwenden. QR-Code und Desktop-Seite (`/`, `/qr.png`) werden nur an den PC selbst (Loopback) ausgeliefert.
 5. Regelmäßige Heartbeat-Anfragen halten die Verbindungsanzeige aktiv und melden einen Sitzungsabbruch an den Browser.
 6. **Neuer Transfer** behält Token und Übertragungsrichtung bei. **Richtung wechseln** behält das Token bei und tauscht Sender und Empfänger.
@@ -36,6 +36,9 @@ http://<windows-ip>:8765/connect/<token>
 - `POST /api/end/<token>` – Sitzung beenden
 - `POST /upload-file/<token>` – Datei als HTTP-Anfragetext hochladen; der bereinigte Dateiname steht in `X-Filename`
 - `GET /download-file/<token>/<filename>` – Datei als Stream herunterladen
+- `GET /api/texts/<token>` – geteilte Texte und Links der Sitzung abrufen
+- `POST /api/texts/<token>` – Text als JSON `{"text": "…"}` senden (höchstens 10.000 Zeichen; die Sitzung hält die letzten 50 Einträge im Arbeitsspeicher)
+- `POST /local/offer` – nur Loopback: ein zweiter CamSend-Prozess (Explorer **Mit CamSend senden**) übergibt Dateipfade an das laufende Fenster. Verlangt den Header `X-CamSend-Key` mit dem zufälligen Schlüssel aus `%LOCALAPPDATA%\CamSend\instance.key`; Webseiten im Browser des PCs können diesen nicht lesen und den eigenen Header nicht ohne CORS-Freigabe senden.
 
 ### Dateiverarbeitung
 
@@ -44,7 +47,7 @@ http://<windows-ip>:8765/connect/<token>
 - Uploads und Downloads werden in Blöcken von 1 MiB verarbeitet, damit der Fortschritt angezeigt werden kann.
 - Die maximale Größe einer HTTP-Anfrage beträgt 2 GB.
 
-### Sicherheitsgrenzen von Version 1.0.0
+### Sicherheitsgrenzen von Version 1.1.0
 
 Die Übertragung bleibt im lokalen Netzwerk, ist aber noch nicht durch TLS oder Ende-zu-Ende-Verschlüsselung geschützt. Das Sitzungstoken verhindert keinen aktiven Angriff innerhalb eines kompromittierten Netzwerks. CamSend sollte deshalb nur in einem vertrauenswürdigen privaten Netzwerk eingesetzt werden.
 
@@ -68,7 +71,7 @@ http://<windows-ip>:8765/connect/<token>
    The local IPv4 address is determined from the active network connections; no external IP service is required.
 2. The mobile device reads the URL with its camera or opens the copied link in a browser.
 3. An unused token expires 15 minutes after it is generated. After the first successful pairing, it remains valid until the session ends or the token is replaced.
-4. The server associates the active session with the connected mobile device. Version 1.0.0 permits only one active browser connection at a time.
+4. The server associates the active session with the connected mobile device. Version 1.1.0 permits only one active browser connection at a time.
    On pairing, the browser receives a random HttpOnly device cookie; every further endpoint requires both the token **and** the cookie. Another device cannot take over a paired session – use **Connect new device** instead. The QR code and desktop page (`/`, `/qr.png`) are served to the PC itself (loopback) only.
 5. Regular heartbeat requests keep the connection indicator active and notify the browser when the session ends.
 6. **New transfer** keeps the token and transfer direction. **Switch direction** keeps the token and swaps sender and receiver.
@@ -86,6 +89,9 @@ http://<windows-ip>:8765/connect/<token>
 - `POST /api/end/<token>` – end the session
 - `POST /upload-file/<token>` – upload a file as the HTTP request body; the sanitized filename is supplied in `X-Filename`
 - `GET /download-file/<token>/<filename>` – download a file as a stream
+- `GET /api/texts/<token>` – list the texts and links shared in this session
+- `POST /api/texts/<token>` – send a text as JSON `{"text": "…"}` (at most 10,000 characters; the session keeps the latest 50 entries in memory)
+- `POST /local/offer` – loopback only: a second CamSend process (Explorer **Send with CamSend**) hands file paths to the running window. Requires the `X-CamSend-Key` header with the random key from `%LOCALAPPDATA%\CamSend\instance.key`; web pages in the PC's browser can neither read it nor send the custom header without a CORS grant.
 
 ### File handling
 
@@ -94,7 +100,7 @@ http://<windows-ip>:8765/connect/<token>
 - Uploads and downloads are processed in 1 MiB chunks so progress can be displayed.
 - The maximum HTTP request size is 2 GB.
 
-### Security boundaries of version 1.0.0
+### Security boundaries of version 1.1.0
 
 Transfers stay on the local network, but they are not yet protected by TLS or end-to-end encryption. The session token does not prevent an active attack inside a compromised network. CamSend should therefore be used only on a trusted private network.
 

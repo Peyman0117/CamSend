@@ -7,3 +7,4 @@ release/
 transfers/*
 !transfers/.gitkeep
 Extern/
+instance.key

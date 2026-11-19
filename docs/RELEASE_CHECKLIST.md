@@ -1,4 +1,4 @@
-# CamSend Local 1.0.0 release checklist
+# CamSend Local 1.1.0 release checklist
 
 A stable GitHub release must not be published until the two mandatory real-device combinations have passed:
 
@@ -65,8 +65,8 @@ A stable GitHub release must not be published until the two mandatory real-devic
 ## Release publication
 
 - [ ] Review `packaging/release-notes.md`
-- [ ] Confirm `main` and `v1.0.0` point to the approved commit
-- [ ] Upload `CamSend-Setup-1.0.0.exe`
-- [ ] Upload `CamSend-Portable-1.0.0.zip`
+- [ ] Confirm `main` and `v1.1.0` point to the approved commit
+- [ ] Upload `CamSend-Setup-1.1.0.exe`
+- [ ] Upload `CamSend-Portable-1.1.0.zip`
 - [ ] Upload `SHA256SUMS.txt`
 - [ ] Include the local-HTTP security warning in the release notes

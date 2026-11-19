@@ -31,8 +31,10 @@ if ($versionSource -notmatch 'VERSION\s*=\s*"(?<version>\d+\.\d+\.\d+)"') {
     throw "Could not read VERSION from camsend_version.py."
 }
 $version = $Matches.version
-if ($version -ne "1.0.0") {
-    throw "This release script is locked to CamSend 1.0.0, but found $version."
+# Guard against publishing a build whose release notes still describe another version.
+$releaseNotes = Get-Content -Raw -Encoding UTF8 (Join-Path $projectRoot "packaging\release-notes.md")
+if ($releaseNotes -notmatch "(?m)^# CamSend $([regex]::Escape($version))\s*$") {
+    throw "packaging/release-notes.md does not start with '# CamSend $version'. Update the release notes first."
 }
 
 $buildDir = Get-ProjectChildPath "build"
@@ -44,13 +46,29 @@ $buildPython = Join-Path $venvDir "Scripts\python.exe"
 Set-Location -LiteralPath $projectRoot
 
 if (-not (Test-Path -LiteralPath $buildPython)) {
-    python -m venv $venvDir
+    # The official build uses Python 3.12 (see BUILDING.md); prefer it via the py launcher.
+    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyLauncher) {
+        & $pyLauncher.Source -V:3.12 -c "pass" 2>$null
+    }
+    if ($pyLauncher -and $LASTEXITCODE -eq 0) {
+        & $pyLauncher.Source -V:3.12 -m venv $venvDir
+    } else {
+        python -m venv $venvDir
+    }
     Assert-LastExitCode "Creating the build virtual environment"
 }
 
 if (-not $SkipDependencyInstall) {
     & $buildPython -m pip install --disable-pip-version-check --requirement (Join-Path $projectRoot "requirements-build.lock")
     Assert-LastExitCode "Installing build dependencies"
+}
+
+# Python 3.14 ships Tcl/Tk 9, whose data lives inside the DLL. PyInstaller's tkinter
+# runtime hook still expects a _tcl_data folder, so such a CamSend.exe fails at start.
+& $buildPython -c "import sys, tkinter; sys.exit(0 if tkinter.TclVersion < 9 else 1)"
+if ($LASTEXITCODE -ne 0) {
+    throw "The build Python uses Tcl/Tk 9, which produces a CamSend.exe that cannot start. Delete .venv-build and install Python 3.12 (py install 3.12)."
 }
 
 foreach ($generatedPath in @($buildDir, $distDir, $releaseDir)) {
@@ -122,6 +140,8 @@ if (-not $SkipInstaller) {
     $compilerCandidates = @(
         $env:INNO_SETUP_COMPILER,
         (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"),
+        # winget installs Inno Setup per user when the shell is not elevated.
+        (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
         (Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"),
         (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 7\ISCC.exe")
     ) | Where-Object { $_ }

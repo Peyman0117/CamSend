@@ -1,4 +1,4 @@
-# Building CamSend 1.0.0 for Windows
+# Building CamSend 1.1.0 for Windows
 
 [Deutsch](#deutsch) · [English](#english)
 
@@ -11,7 +11,7 @@ Der Release-Build erzeugt bewusst einen PyInstaller-Ordner statt einer einzelnen
 ### Voraussetzungen
 
 - Windows 10 oder Windows 11 (64 Bit)
-- Python 3.10 oder neuer (64 Bit; für den offiziellen Build wird Python 3.12 verwendet)
+- Python 3.10 bis 3.13 (64 Bit; für den offiziellen Build wird Python 3.12 verwendet). **Nicht Python 3.14:** Es bringt Tcl/Tk 9 mit, und die damit gebaute `CamSend.exe` startet nicht. Das Build-Skript nimmt automatisch Python 3.12, wenn es über `py install 3.12` installiert ist, und bricht bei Tcl/Tk 9 mit einer Meldung ab.
 - PowerShell 5.1 oder neuer
 - Inno Setup 6.7.3 mit `ISCC.exe` für den Setup-Build
 
@@ -38,8 +38,8 @@ Ergebnisse:
 
 ```text
 dist/CamSend/CamSend.exe
-release/CamSend-Portable-1.0.0.zip
-release/CamSend-Setup-1.0.0.exe
+release/CamSend-Portable-1.1.0.zip
+release/CamSend-Setup-1.1.0.exe
 release/SHA256SUMS.txt
 ```
 
@@ -73,7 +73,7 @@ The release build intentionally uses a PyInstaller one-folder bundle instead of 
 ### Requirements
 
 - 64-bit Windows 10 or Windows 11
-- 64-bit Python 3.10 or newer (the official build uses Python 3.12)
+- 64-bit Python 3.10 to 3.13 (the official build uses Python 3.12). **Not Python 3.14:** it ships Tcl/Tk 9 and the resulting `CamSend.exe` fails to start. The build script picks Python 3.12 automatically when it is installed via `py install 3.12` and stops with a message on Tcl/Tk 9.
 - PowerShell 5.1 or newer
 - Inno Setup 6.7.3 with `ISCC.exe` for the installer build
 
@@ -100,8 +100,8 @@ Outputs:
 
 ```text
 dist/CamSend/CamSend.exe
-release/CamSend-Portable-1.0.0.zip
-release/CamSend-Setup-1.0.0.exe
+release/CamSend-Portable-1.1.0.zip
+release/CamSend-Setup-1.1.0.exe
 release/SHA256SUMS.txt
 ```
 

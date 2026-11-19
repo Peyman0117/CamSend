@@ -23,7 +23,7 @@
     {% if mode == 'receive' %}<section class="content-card transfer-card">
       <div class="section-heading"><span class="direction-icon">↗</span><div><p class="section-label">{{ t.label_send }}</p><h2>Smartphone <span>→</span> Windows</h2></div></div>
       {# No action on purpose: the submit handler below streams each file to /upload-file/<token>; the old multipart endpoint no longer exists. #}
-      <form>
+      <form class="upload-form">
         <label class="picker"><span class="picker-icon">＋</span><strong>{{ t.select }}</strong><small>{{ t.multi_select }}</small>
           <input type="file" name="files" multiple required>
         </label>
@@ -46,6 +46,7 @@
         <p class="hint">{{ t.no_files }}</p>
       {% endif %}
     </section>{% endif %}
+    {% include "_text_card.html" %}
     <section class="content-card history-card">
       <div class="section-heading compact"><span class="direction-icon muted-icon">↻</span><div><p class="section-label">{{ t.activity }}</p><h2>{{ t.history }}</h2></div></div>
       <ul id="history" class="files"><li class="hint">{{ t.waiting }}</li></ul>
@@ -104,7 +105,8 @@
     };
     heartbeat(); setInterval(() => { if (!clientEnded) heartbeat(); }, 1500);
 
-    const form = document.querySelector('form');
+    // Select by class: the page also contains the text form from _text_card.html.
+    const form = document.querySelector('form.upload-form');
     if (form) form.addEventListener('submit', async event => {
       event.preventDefault();
       if (form.dataset.sending === 'true') return;

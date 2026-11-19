@@ -4,6 +4,7 @@ import io
 import ipaddress
 import mimetypes
 import os
+import queue
 import re
 import secrets
 import socket
@@ -40,6 +41,12 @@ SESSION_TTL_SECONDS = 15 * 60
 HEARTBEAT_TIMEOUT_SECONDS = 20
 MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
 DEVICE_COOKIE = "camsend_device"
+MAX_TEXT_CHARS = 10_000
+MAX_TEXT_MESSAGES = 50
+# JSON requests (texts, local hand-off) are tiny; refusing large bodies early keeps a
+# paired browser from making the server buffer up to MAX_FILE_BYTES in memory.
+MAX_JSON_BYTES = 64 * 1024
+INSTANCE_KEY_PATH = DATA_DIR / "instance.key"
 
 app = Flask(
     __name__,
@@ -157,6 +164,52 @@ MOBILE_EXTRA = {
 for language_code, extra_text in MOBILE_EXTRA.items():
     MOBILE_TEXT[language_code].update(extra_text)
 
+MOBILE_TEXT_SHARING = {
+    "de": {
+        "text_label": "Text & Links", "text_title": "Mit dem PC teilen",
+        "text_placeholder": "Text oder Link eingeben …", "text_send": "Senden",
+        "text_copy": "Kopieren", "text_copied": "Kopiert", "text_copy_failed": "Bitte Text markieren und kopieren.",
+        "text_empty": "Noch keine Texte oder Links.", "text_from_pc": "Vom PC", "text_from_phone": "Von diesem Smartphone",
+        "text_too_long": "Der Text ist zu lang (max. 10.000 Zeichen).", "text_failed": "Senden fehlgeschlagen. Bitte erneut versuchen.",
+    },
+    "en": {
+        "text_label": "Text & links", "text_title": "Share with the PC",
+        "text_placeholder": "Enter text or a link …", "text_send": "Send",
+        "text_copy": "Copy", "text_copied": "Copied", "text_copy_failed": "Please select the text and copy it.",
+        "text_empty": "No texts or links yet.", "text_from_pc": "From the PC", "text_from_phone": "From this phone",
+        "text_too_long": "The text is too long (max. 10,000 characters).", "text_failed": "Sending failed. Please try again.",
+    },
+    "tr": {
+        "text_label": "Metin ve bağlantılar", "text_title": "Bilgisayarla paylaş",
+        "text_placeholder": "Metin veya bağlantı girin …", "text_send": "Gönder",
+        "text_copy": "Kopyala", "text_copied": "Kopyalandı", "text_copy_failed": "Lütfen metni seçip kopyalayın.",
+        "text_empty": "Henüz metin veya bağlantı yok.", "text_from_pc": "Bilgisayardan", "text_from_phone": "Bu telefondan",
+        "text_too_long": "Metin çok uzun (en fazla 10.000 karakter).", "text_failed": "Gönderilemedi. Lütfen tekrar deneyin.",
+    },
+    "az": {
+        "text_label": "Mətn və linklər", "text_title": "Kompüterlə paylaş",
+        "text_placeholder": "Mətn və ya link daxil edin …", "text_send": "Göndər",
+        "text_copy": "Kopyala", "text_copied": "Kopyalandı", "text_copy_failed": "Zəhmət olmasa mətni seçib kopyalayın.",
+        "text_empty": "Hələ mətn və ya link yoxdur.", "text_from_pc": "Kompüterdən", "text_from_phone": "Bu telefondan",
+        "text_too_long": "Mətn çox uzundur (maks. 10.000 simvol).", "text_failed": "Göndərmək alınmadı. Yenidən cəhd edin.",
+    },
+    "ru": {
+        "text_label": "Текст и ссылки", "text_title": "Обмен с компьютером",
+        "text_placeholder": "Введите текст или ссылку …", "text_send": "Отправить",
+        "text_copy": "Копировать", "text_copied": "Скопировано", "text_copy_failed": "Выделите текст и скопируйте его.",
+        "text_empty": "Пока нет текстов или ссылок.", "text_from_pc": "С компьютера", "text_from_phone": "С этого телефона",
+        "text_too_long": "Текст слишком длинный (макс. 10 000 символов).", "text_failed": "Не удалось отправить. Повторите попытку.",
+    },
+}
+for language_code, sharing_text in MOBILE_TEXT_SHARING.items():
+    MOBILE_TEXT[language_code].update(sharing_text)
+
+# Files handed over by a second CamSend process (Explorer "Send with CamSend").
+# The HTTP handler only enqueues; the Tk main thread drains the queue in poll(),
+# because Tk must not be touched from the server thread.
+local_offer_queue: "queue.Queue[list[str]]" = queue.Queue()
+local_handoff_key: str | None = None
+
 session_token = secrets.token_urlsafe(24)
 session_created = time.time()
 session_lock = threading.Lock()
@@ -165,7 +218,7 @@ session_state = {
     "device_ip": None, "device_key": None, "paired": False,
     "receive_dir": str(TRANSFER_DIR),
     "language": "de",
-    "ended": False, "offered_files": [], "history": [],
+    "ended": False, "offered_files": [], "history": [], "messages": [],
     "transfer": {"active": False, "name": "", "done": 0, "total": 0, "direction": ""},
 }
 
@@ -181,7 +234,7 @@ def new_session() -> str:
             "device_ip": None, "device_key": None, "paired": False,
             "receive_dir": str(TRANSFER_DIR),
             "language": "de",
-            "ended": False, "offered_files": [], "history": [],
+            "ended": False, "offered_files": [], "history": [], "messages": [],
             "transfer": {"active": False, "name": "", "done": 0, "total": 0, "direction": ""},
         }
     return session_token
@@ -324,6 +377,53 @@ def update_history(item_id: str, **values) -> None:
         if item["id"] == item_id:
             item.update(values)
             break
+
+
+def prepare_text(value) -> tuple[str | None, str | None]:
+    """Normalise a shared text. Returns (text, None) or (None, error_key)."""
+    if not isinstance(value, str):
+        return None, "text_failed"
+    text = value.replace("\r\n", "\n").replace("\r", "\n")
+    if not text.strip():
+        return None, "text_empty"
+    if len(text) > MAX_TEXT_CHARS:
+        return None, "text_too_long"
+    return text, None
+
+
+def add_message(sender: str, text: str) -> dict:
+    """Store a text/link message. Caller must hold session_lock."""
+    item = {"id": secrets.token_hex(8), "from": sender, "text": text, "time": time.time()}
+    messages = session_state["messages"]
+    messages.append(item)
+    # Keep memory bounded for long sessions; older messages simply scroll away.
+    del messages[:-MAX_TEXT_MESSAGES]
+    return item
+
+
+def enable_local_handoff() -> None:
+    """Accept files from a second CamSend process started via Explorer.
+
+    The key file lives in the user's profile, so only processes of this Windows
+    user can read it. The key (sent as a custom header) also stops web pages in the
+    PC's browser from posting to the loopback endpoint (CSRF): they cannot read the
+    file and a custom header forces a CORS preflight the server never answers.
+    """
+    global local_handoff_key
+    local_handoff_key = secrets.token_urlsafe(32)
+    INSTANCE_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    INSTANCE_KEY_PATH.write_text(f"{PORT}\n{local_handoff_key}\n", encoding="utf-8")
+
+
+def disable_local_handoff() -> None:
+    global local_handoff_key
+    try:
+        # Only remove the file if it is still ours; a newer instance may own it.
+        if local_handoff_key and INSTANCE_KEY_PATH.read_text(encoding="utf-8").split()[1:2] == [local_handoff_key]:
+            INSTANCE_KEY_PATH.unlink()
+    except (OSError, IndexError):
+        pass
+    local_handoff_key = None
 
 
 def format_bytes(size: int) -> str:
@@ -588,6 +688,49 @@ def download_file(token: str, name: str):
         "Content-Disposition": f'attachment; filename="{fallback_name}"; filename*=UTF-8\'\'{encoded_name}',
         "Content-Type": mimetypes.guess_type(safe_name)[0] or "application/octet-stream",
     })
+
+
+@app.get("/api/texts/<token>")
+def list_texts(token: str):
+    require_session(token)
+    with session_lock:
+        return {"messages": [dict(item) for item in session_state["messages"]]}
+
+
+@app.post("/api/texts/<token>")
+def send_text(token: str):
+    require_session(token)
+    if (request.content_length or 0) > MAX_JSON_BYTES:
+        return {"ok": False, "error": "text_too_long"}, 413
+    payload = request.get_json(silent=True) or {}
+    text, error = prepare_text(payload.get("text"))
+    if error:
+        return {"ok": False, "error": error}, 400
+    with session_lock:
+        item = add_message("phone", text)
+        touch_session()
+    return {"ok": True, "message": dict(item)}
+
+
+@app.post("/local/offer")
+def local_offer():
+    # Only another CamSend process of this Windows user may hand over files; see
+    # enable_local_handoff() for why both checks are needed.
+    if not is_loopback_request() or not local_handoff_key:
+        abort(404)
+    supplied = request.headers.get("X-CamSend-Key", "")
+    if not secrets.compare_digest(supplied.encode("utf-8"), local_handoff_key.encode("utf-8")):
+        abort(403)
+    if (request.content_length or 0) > MAX_JSON_BYTES:
+        abort(413)
+    payload = request.get_json(silent=True) or {}
+    paths = payload.get("paths")
+    if not isinstance(paths, list):
+        abort(400)
+    files = [str(Path(value)) for value in paths if isinstance(value, str) and Path(value).is_file()]
+    if files:
+        local_offer_queue.put(files)
+    return {"ok": True, "accepted": len(files)}
 
 
 @app.errorhandler(400)

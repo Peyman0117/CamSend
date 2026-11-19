@@ -1,21 +1,31 @@
 from __future__ import annotations
 
+import json
 import os
 import locale
 import math
 import mimetypes
+import queue
+import re
 import shutil
+import sys
 import threading
+import time
 import tkinter as tk
+import urllib.request
+import webbrowser
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from tkinter import filedialog, messagebox
+from urllib.parse import urlparse
 
 import qrcode
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageTk
 from werkzeug.serving import make_server
 
 import app as transfer
+import shell_integration
 from camsend_version import VERSION
 
 
@@ -124,11 +134,105 @@ WORDS = {
     },
 }
 
+WORDS_1_1 = {
+    "de": {
+        "text_button": "Text oder Link senden", "text_title": "Text & Links",
+        "text_intro": "Texte und Links direkt zwischen PC und Smartphone austauschen. Strg+Enter sendet.",
+        "text_send": "An Smartphone senden", "text_copy": "Kopieren", "text_open": "Öffnen",
+        "text_copied": "In die Zwischenablage kopiert", "text_empty": "Noch keine Texte oder Links.",
+        "text_from_phone": "Vom Smartphone", "text_from_pc": "Von diesem PC", "text_sent": "Gesendet",
+        "text_too_long": "Der Text ist zu lang (max. 10.000 Zeichen).",
+        "shell_menu": "Im Explorer-Rechtsklick anzeigen", "shell_send": "Mit CamSend senden",
+        "shell_error": "Der Explorer-Eintrag konnte nicht geändert werden",
+        "offer_error": "Die Datei konnte nicht vorbereitet werden",
+    },
+    "en": {
+        "text_button": "Send text or link", "text_title": "Text & links",
+        "text_intro": "Exchange texts and links directly between PC and phone. Ctrl+Enter sends.",
+        "text_send": "Send to phone", "text_copy": "Copy", "text_open": "Open",
+        "text_copied": "Copied to the clipboard", "text_empty": "No texts or links yet.",
+        "text_from_phone": "From the phone", "text_from_pc": "From this PC", "text_sent": "Sent",
+        "text_too_long": "The text is too long (max. 10,000 characters).",
+        "shell_menu": "Show in Explorer right-click menu", "shell_send": "Send with CamSend",
+        "shell_error": "The Explorer entry could not be changed",
+        "offer_error": "The file could not be prepared",
+    },
+    "tr": {
+        "text_button": "Metin veya bağlantı gönder", "text_title": "Metin ve bağlantılar",
+        "text_intro": "Metin ve bağlantıları bilgisayar ile telefon arasında doğrudan paylaşın. Ctrl+Enter gönderir.",
+        "text_send": "Telefona gönder", "text_copy": "Kopyala", "text_open": "Aç",
+        "text_copied": "Panoya kopyalandı", "text_empty": "Henüz metin veya bağlantı yok.",
+        "text_from_phone": "Telefondan", "text_from_pc": "Bu bilgisayardan", "text_sent": "Gönderildi",
+        "text_too_long": "Metin çok uzun (en fazla 10.000 karakter).",
+        "shell_menu": "Gezgin sağ tık menüsünde göster", "shell_send": "CamSend ile gönder",
+        "shell_error": "Gezgin girdisi değiştirilemedi",
+        "offer_error": "Dosya hazırlanamadı",
+    },
+    "az": {
+        "text_button": "Mətn və ya link göndər", "text_title": "Mətn və linklər",
+        "text_intro": "Mətn və linkləri kompüter ilə telefon arasında birbaşa paylaşın. Ctrl+Enter göndərir.",
+        "text_send": "Telefona göndər", "text_copy": "Kopyala", "text_open": "Aç",
+        "text_copied": "Mübadilə buferinə kopyalandı", "text_empty": "Hələ mətn və ya link yoxdur.",
+        "text_from_phone": "Telefondan", "text_from_pc": "Bu kompüterdən", "text_sent": "Göndərildi",
+        "text_too_long": "Mətn çox uzundur (maks. 10.000 simvol).",
+        "shell_menu": "Explorer sağ klik menyusunda göstər", "shell_send": "CamSend ilə göndər",
+        "shell_error": "Explorer girişini dəyişmək mümkün olmadı",
+        "offer_error": "Faylı hazırlamaq mümkün olmadı",
+    },
+    "ru": {
+        "text_button": "Отправить текст или ссылку", "text_title": "Текст и ссылки",
+        "text_intro": "Обменивайтесь текстом и ссылками напрямую между компьютером и телефоном. Ctrl+Enter отправляет.",
+        "text_send": "Отправить на телефон", "text_copy": "Копировать", "text_open": "Открыть",
+        "text_copied": "Скопировано в буфер обмена", "text_empty": "Пока нет текстов или ссылок.",
+        "text_from_phone": "С телефона", "text_from_pc": "С этого компьютера", "text_sent": "Отправлено",
+        "text_too_long": "Текст слишком длинный (макс. 10 000 символов).",
+        "shell_menu": "Показывать в контекстном меню Проводника", "shell_send": "Отправить через CamSend",
+        "shell_error": "Не удалось изменить пункт меню Проводника",
+        "offer_error": "Не удалось подготовить файл",
+    },
+}
+for _language, _words in WORDS_1_1.items():
+    WORDS[_language].update(_words)
+
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "English", "tr": "Türkçe", "az": "Azərbaycan", "ru": "Русский"}
+URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+HANDOFF_TIMEOUT_SECONDS = 2.0
+HANDOFF_RETRY_SECONDS = 6.0
+
+
+def system_language() -> str:
+    prefix = (locale.getlocale()[0] or "en").lower().split("_")[0].split("-")[0]
+    return prefix if prefix in WORDS else "en"
+
+
+def first_url(text: str) -> str | None:
+    match = URL_PATTERN.search(text)
+    if not match:
+        return None
+    url = match.group(0).rstrip(".,;:!?)]}")
+    return url if urlparse(url).scheme in {"http", "https"} else None
+
+
+def hand_off_to_running_instance(paths: list[str]) -> bool:
+    """Pass files to an already running CamSend; True if it accepted them."""
+    try:
+        port_text, key = transfer.INSTANCE_KEY_PATH.read_text(encoding="utf-8").split()[:2]
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{int(port_text)}/local/offer",
+            data=json.dumps({"paths": paths}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "X-CamSend-Key": key},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=HANDOFF_TIMEOUT_SECONDS) as response:
+            return response.status == 200
+    except (OSError, ValueError):
+        # No instance, a stale key file from a crashed run, or a foreign server on
+        # the port: start a normal window instead.
+        return False
 
 
 class CamSendWindow:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, initial_paths: list[str] | None = None):
         self.root = root
         root.title(f"CamSend {VERSION}")
         root.geometry("480x690")
@@ -140,12 +244,21 @@ class CamSendWindow:
             root.iconphoto(True, self.icon_photo)
         self.server = make_server("0.0.0.0", transfer.PORT, transfer.app, threaded=True)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        # Written only after the port is bound, so a second process never hands
+        # files to an instance whose server is not listening yet.
+        transfer.enable_local_handoff()
         self.qr_photo = None
         self.connection_url = None
-        system_language = (locale.getlocale()[0] or "en").lower()
-        prefix = system_language.split("_")[0].split("-")[0]
-        self.language = prefix if prefix in WORDS else "en"
+        self.text_window = None
+        self.text_signature = None
+        self.seen_message_ids: set[str] = set()
+        self.language = system_language()
         transfer.session_state["language"] = self.language
+        if shell_integration.is_supported():
+            try:
+                shell_integration.refresh(sys.executable, self.tr("shell_send"))
+            except OSError:
+                pass  # Best effort only; the menu toggle reports errors when used.
         self.view = ""
         self.was_connected = False
         self.history_signature = None
@@ -158,6 +271,8 @@ class CamSendWindow:
                              highlightbackground=BORDER, highlightthickness=1)
         self.body.pack(fill="both", expand=True, padx=16, pady=16)
         self.show_qr(False)
+        if initial_paths:
+            self.handle_shell_files(initial_paths)
         self.poll()
         root.protocol("WM_DELETE_WINDOW", self.close)
 
@@ -253,15 +368,37 @@ class CamSendWindow:
         for code, name in LANGUAGE_NAMES.items():
             marker = "✓  " if code == self.language else "     "
             menu.add_command(label=marker + name, command=lambda value=name: self.change_language(value))
+        if shell_integration.is_supported():
+            menu.add_separator()
+            marker = "✓  " if shell_integration.is_registered() else "     "
+            menu.add_command(label=marker + self.tr("shell_menu"), command=self.toggle_shell_entry)
         self.language_menu = menu
         x = anchor.winfo_rootx() + anchor.winfo_width() - 168
         y = anchor.winfo_rooty() + anchor.winfo_height() + 7
         menu.tk_popup(max(anchor.winfo_rootx(), x), y)
 
+    def toggle_shell_entry(self):
+        try:
+            if shell_integration.is_registered():
+                shell_integration.unregister()
+            else:
+                shell_integration.register(sys.executable, self.tr("shell_send"))
+        except OSError as error:
+            messagebox.showerror("CamSend", f"{self.tr('shell_error')}:\n{error}", parent=self.root)
+
     def change_language(self, selected):
         self.language = next(code for code, name in LANGUAGE_NAMES.items() if name == selected)
         with transfer.session_lock:
             transfer.session_state["language"] = self.language
+        if shell_integration.is_supported() and shell_integration.is_registered():
+            try:
+                shell_integration.register(sys.executable, self.tr("shell_send"))
+            except OSError:
+                pass  # Keeps the old label; the entry itself still works.
+        if self.text_window is not None and self.text_window.winfo_exists():
+            self.text_window.destroy()
+            self.text_window = None
+            self.open_texts()
         if self.view == "qr": self.show_qr(False)
         elif self.view == "connected": self.show_connected()
         elif self.view == "disconnected": self.show_disconnected()
@@ -326,6 +463,7 @@ class CamSendWindow:
                  font=("Segoe UI", 34, "bold")).pack(pady=(32, 22))
         self.button(self.tr("receive"), self.receive).pack(fill="x", pady=7)
         self.button(self.tr("send"), self.send).pack(fill="x", pady=7)
+        self.button(self.tr("text_button"), self.open_texts, True).pack(fill="x", pady=7)
         self.button(self.tr("other"), lambda: self.show_qr(True), True).pack(fill="x", pady=(24, 7))
 
     def receive(self):
@@ -342,6 +480,12 @@ class CamSendWindow:
         selected = filedialog.askopenfilenames(parent=self.root, title=self.tr("select"))
         if not selected:
             return False
+        count = self.offer_files(selected)
+        self.show_progress(self.tr("sending"), f"{count} {self.tr('ready')}")
+        return True
+
+    def offer_files(self, selected) -> int:
+        """Copy files into the transfer folder and offer them to the phone."""
         prepared = []
         for source_name in selected:
             source = Path(source_name)
@@ -359,8 +503,34 @@ class CamSendWindow:
                 if target.name not in transfer.session_state["offered_files"]:
                     transfer.session_state["offered_files"].append(target.name)
                     transfer.add_history(target.name, target.stat().st_size, "send", "waiting")
-        self.show_progress(self.tr("sending"), f"{len(selected)} {self.tr('ready')}")
-        return True
+        return len(prepared)
+
+    def bring_to_front(self):
+        self.root.deiconify()
+        self.root.lift()
+        # Windows only lets a process steal focus in limited cases; a short topmost
+        # toggle reliably raises the window after an Explorer hand-off.
+        self.root.attributes("-topmost", True)
+        self.root.after(300, lambda: self.root.attributes("-topmost", False))
+        self.root.focus_force()
+
+    def handle_shell_files(self, paths):
+        """Offer files from Explorer's "Send with CamSend" entry."""
+        files = [path for path in paths if Path(path).is_file()]
+        if not files:
+            return
+        self.bring_to_front()
+        if self.view in {"start", "disconnected"}:
+            self.show_qr(True)
+        try:
+            count = self.offer_files(files)
+        except OSError as error:
+            messagebox.showerror("CamSend", f"{self.tr('offer_error')}:\n{error}", parent=self.root)
+            return
+        if self.view in {"connected", "progress"}:
+            self.show_progress(self.tr("sending"), f"{count} {self.tr('ready')}")
+        # In the QR view the files wait in send mode; poll() opens the send view as
+        # soon as a phone connects, and the phone page opens directly in that mode.
 
     def show_progress(self, heading, subtext):
         self.view = "progress"
@@ -424,9 +594,12 @@ class CamSendWindow:
                       bg=BLUE, activebackground=BLUE_DARK, fg="#ffffff", activeforeground="#ffffff",
                       relief="flat", bd=0, padx=10, pady=10,
                       font=("Segoe UI", 9, "bold")).pack(side="left", expand=True, fill="x", padx=(0, 4))
+        tk.Button(actions, text=self.tr("text_title"), command=self.open_texts, bg="#edf3f8", fg="#385069",
+                  activebackground="#e2ebf3", activeforeground="#385069", relief="flat", bd=0,
+                  padx=10, pady=10, font=("Segoe UI", 9, "bold")).pack(side="left", expand=True, fill="x", padx=4 if mode == "send" else (0, 4))
         tk.Button(actions, text=self.tr("end"), command=self.end_session, bg="#edf3f8", fg="#385069",
                   activebackground="#e2ebf3", activeforeground="#385069", relief="flat", bd=0,
-                  padx=10, pady=10, font=("Segoe UI", 9, "bold")).pack(side="left", expand=True, fill="x", padx=(4 if mode == "send" else 0, 0))
+                  padx=10, pady=10, font=("Segoe UI", 9, "bold")).pack(side="left", expand=True, fill="x", padx=(4, 0))
 
     def draw_transfer_scene(self):
         if not hasattr(self, "transfer_canvas") or not self.transfer_canvas.winfo_exists():
@@ -622,6 +795,153 @@ class CamSendWindow:
             self.history_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
         return "break"
 
+    def open_texts(self):
+        if self.text_window is not None and self.text_window.winfo_exists():
+            self.text_window.deiconify()
+            self.text_window.lift()
+            self.text_input.focus_set()
+            return
+        window = tk.Toplevel(self.root)
+        self.text_window = window
+        self.text_signature = None
+        window.title(f"CamSend – {self.tr('text_title')}")
+        window.geometry("440x560")
+        window.minsize(380, 460)
+        window.configure(bg=BG)
+        if self.icon_photo:
+            window.iconphoto(False, self.icon_photo)
+        body = tk.Frame(window, bg=PANEL, padx=20, pady=18, highlightbackground=BORDER, highlightthickness=1)
+        body.pack(fill="both", expand=True, padx=12, pady=12)
+        tk.Label(body, text=self.tr("text_title"), bg=PANEL, fg=TEXT, anchor="w",
+                 font=("Segoe UI", 18, "bold")).pack(fill="x")
+        tk.Label(body, text=self.tr("text_intro"), bg=PANEL, fg=MUTED, anchor="w", justify="left",
+                 wraplength=370, font=("Segoe UI", 9)).pack(fill="x", pady=(2, 10))
+
+        shell = tk.Frame(body, bg=SOFT, highlightbackground=BORDER, highlightthickness=1)
+        shell.pack(fill="both", expand=True)
+        self.text_canvas = tk.Canvas(shell, bg=SOFT, bd=0, highlightthickness=0, yscrollincrement=24)
+        scrollbar = tk.Scrollbar(shell, orient="vertical", command=self.text_canvas.yview, width=10,
+                                 relief="flat", bd=0, highlightthickness=0, troughcolor=SOFT)
+        self.text_canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.text_canvas.pack(side="left", fill="both", expand=True)
+        self.text_list = tk.Frame(self.text_canvas, bg=SOFT)
+        text_list_window = self.text_canvas.create_window((0, 0), window=self.text_list, anchor="nw")
+        self.text_list.bind("<Configure>", lambda _event: self.text_canvas.configure(
+            scrollregion=self.text_canvas.bbox("all")))
+        self.text_canvas.bind("<Configure>", lambda event: self.text_canvas.itemconfigure(
+            text_list_window, width=event.width))
+        self.text_canvas.bind("<MouseWheel>", self.scroll_texts)
+
+        self.text_input = tk.Text(body, height=4, wrap="word", bg=SOFT, fg=TEXT, relief="flat", bd=0,
+                                  highlightbackground=BORDER, highlightcolor=BLUE, highlightthickness=1,
+                                  padx=10, pady=8, font=("Segoe UI", 10), undo=True)
+        self.text_input.pack(fill="x", pady=(12, 8))
+        self.text_input.bind("<Control-Return>", lambda _event: (self.send_text(), "break")[1])
+        tk.Button(body, text=self.tr("text_send"), command=self.send_text, bg=BLUE, activebackground=BLUE_DARK,
+                  fg="#ffffff", activeforeground="#ffffff", relief="flat", bd=0, padx=12, pady=10,
+                  font=("Segoe UI", 10, "bold"), cursor="hand2").pack(fill="x")
+        self.text_status = tk.Label(body, text="", bg=PANEL, fg=MUTED, anchor="w", font=("Segoe UI", 9))
+        self.text_status.pack(fill="x", pady=(6, 0))
+        window.protocol("WM_DELETE_WINDOW", self.close_texts)
+        self.render_texts()
+        self.text_input.focus_set()
+
+    def close_texts(self):
+        if self.text_window is not None and self.text_window.winfo_exists():
+            self.text_window.destroy()
+        self.text_window = None
+
+    def scroll_texts(self, event):
+        if event.delta:
+            self.text_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        return "break"
+
+    def send_text(self):
+        text, error = transfer.prepare_text(self.text_input.get("1.0", "end-1c"))
+        if error == "text_too_long":
+            self.text_status.configure(text=self.tr("text_too_long"), fg="#c53b2c")
+            return
+        if error:
+            return  # Empty input: nothing to send, no error needed.
+        with transfer.session_lock:
+            item = transfer.add_message("pc", text)
+        self.seen_message_ids.add(item["id"])
+        self.text_input.delete("1.0", "end")
+        self.text_status.configure(text="✓  " + self.tr("text_sent"), fg=GREEN)
+        self.render_texts()
+
+    def copy_text(self, text):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        self.root.update()
+        if self.text_window is not None and self.text_window.winfo_exists():
+            self.text_status.configure(text="✓  " + self.tr("text_copied"), fg=GREEN)
+
+    def render_texts(self):
+        if self.text_window is None or not self.text_window.winfo_exists():
+            return
+        with transfer.session_lock:
+            messages = [dict(item) for item in transfer.session_state["messages"]]
+        signature = tuple(item["id"] for item in messages)
+        if signature == self.text_signature:
+            return
+        self.text_signature = signature
+        for child in self.text_list.winfo_children():
+            child.destroy()
+        if not messages:
+            tk.Label(self.text_list, text=self.tr("text_empty"), bg=SOFT, fg=MUTED,
+                     font=("Segoe UI", 9)).pack(pady=18)
+        for item in messages:
+            from_phone = item["from"] == "phone"
+            row = tk.Frame(self.text_list, bg="#ffffff" if from_phone else "#eaf2ff", padx=10, pady=8,
+                           highlightbackground=BORDER, highlightthickness=1)
+            row.pack(fill="x", padx=8, pady=(8, 0))
+            sender = self.tr("text_from_phone") if from_phone else self.tr("text_from_pc")
+            stamp = datetime.fromtimestamp(item["time"]).strftime("%H:%M")
+            header = tk.Label(row, text=f"{sender} · {stamp}", bg=row["bg"], fg=MUTED, anchor="w",
+                              font=("Segoe UI", 8, "bold"))
+            header.pack(fill="x")
+            body = tk.Label(row, text=item["text"], bg=row["bg"], fg=TEXT, anchor="w", justify="left",
+                            wraplength=330, font=("Segoe UI", 10))
+            body.pack(fill="x", pady=(2, 6))
+            buttons = tk.Frame(row, bg=row["bg"])
+            buttons.pack(fill="x")
+            tk.Button(buttons, text=self.tr("text_copy"), command=lambda value=item["text"]: self.copy_text(value),
+                      bg="#edf3f8", fg="#385069", activebackground="#e2ebf3", relief="flat", bd=0,
+                      padx=10, pady=4, font=("Segoe UI", 8, "bold"), cursor="hand2").pack(side="left")
+            url = first_url(item["text"])
+            if url:
+                # first_url() only returns http(s) URLs, so this never launches
+                # file:, javascript: or other handlers from text the phone sent.
+                tk.Button(buttons, text=self.tr("text_open"), command=lambda value=url: webbrowser.open(value),
+                          bg=BLUE, fg="#ffffff", activebackground=BLUE_DARK, activeforeground="#ffffff",
+                          relief="flat", bd=0, padx=10, pady=4, font=("Segoe UI", 8, "bold"),
+                          cursor="hand2").pack(side="left", padx=(6, 0))
+            for widget in (row, header, body, buttons):
+                widget.bind("<MouseWheel>", self.scroll_texts)
+        tk.Frame(self.text_list, bg=SOFT, height=8).pack()
+        self.text_list.update_idletasks()
+        self.text_canvas.configure(scrollregion=self.text_canvas.bbox("all"))
+        self.text_canvas.yview_moveto(1.0)
+
+    def check_texts(self, messages):
+        """Open the text window when the phone sent something new."""
+        incoming = [item for item in messages if item["from"] == "phone" and item["id"] not in self.seen_message_ids]
+        self.seen_message_ids.update(item["id"] for item in messages)
+        if incoming:
+            self.open_texts()
+            self.text_window.lift()
+        self.render_texts()
+
+    def drain_shell_files(self):
+        while True:
+            try:
+                paths = transfer.local_offer_queue.get_nowait()
+            except queue.Empty:
+                return
+            self.handle_shell_files(paths)
+
     def show_disconnected(self):
         self.view = "disconnected"
         self.clear()
@@ -631,16 +951,24 @@ class CamSendWindow:
         self.button(self.tr("new"), lambda: self.show_qr(True)).pack(fill="x", pady=10)
 
     def poll(self):
-        now = __import__("time").time()
+        self.drain_shell_files()
+        now = time.time()
         with transfer.session_lock:
             state = dict(transfer.session_state)
             state["transfer"] = dict(transfer.session_state["transfer"])
+            state["offered_files"] = list(transfer.session_state["offered_files"])
+            state["messages"] = [dict(item) for item in transfer.session_state["messages"]]
+        self.check_texts(state["messages"])
         connected = state["connected"] and now - state["last_seen"] < transfer.HEARTBEAT_TIMEOUT_SECONDS
         if state.get("ended") and self.view not in {"start", "qr"}:
             self.show_start()
         elif connected and self.view == "qr":
             self.was_connected = True
-            self.show_connected()
+            if state.get("mode") == "send" and state["offered_files"]:
+                # Files from Explorer were queued before the phone connected.
+                self.show_progress(self.tr("sending"), f"{len(state['offered_files'])} {self.tr('ready')}")
+            else:
+                self.show_connected()
         elif self.was_connected and not connected and self.view not in {"qr", "disconnected"}:
             self.show_disconnected()
         if self.view == "progress":
@@ -701,17 +1029,43 @@ class CamSendWindow:
         self.root.after(500, self.poll)
 
     def close(self):
+        transfer.disable_local_handoff()
         self.server.shutdown()
         self.root.destroy()
 
 
-def main():
+def main(argv: list[str] | None = None):
+    args = sys.argv[1:] if argv is None else argv
+    language = system_language()
+    # Used by the installer (runs as the signed-in user) and its uninstaller.
+    if args[:1] == ["--register-shell"]:
+        if shell_integration.is_supported():
+            shell_integration.register(sys.executable, WORDS[language]["shell_send"])
+        return
+    if args[:1] == ["--unregister-shell"]:
+        shell_integration.unregister()
+        return
+
+    initial_paths: list[str] = []
+    if args[:1] == ["--send"]:
+        initial_paths = [str(Path(value)) for value in args[1:] if Path(value).is_file()]
+        if initial_paths and hand_off_to_running_instance(initial_paths):
+            return
+
     root = tk.Tk()
     try:
-        CamSendWindow(root)
+        CamSendWindow(root, initial_paths)
     except OSError as error:
-        system_language = (locale.getlocale()[0] or "en").lower().split("_")[0].split("-")[0]
-        language = system_language if system_language in WORDS else "en"
+        if initial_paths:
+            # Explorer starts one process per selected file. Several may race for the
+            # port; the losers hand their file to the winner once it is listening.
+            root.withdraw()
+            deadline = time.monotonic() + HANDOFF_RETRY_SECONDS
+            while time.monotonic() < deadline:
+                if hand_off_to_running_instance(initial_paths):
+                    root.destroy()
+                    return
+                time.sleep(0.25)
         messagebox.showerror("CamSend", f"{WORDS[language]['server_error']}:\n{error}")
         root.destroy()
         return

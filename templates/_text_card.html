@@ -1,0 +1,126 @@
+{# Shared "Text & links" card for the phone pages (waiting.html and phone.html). #}
+<section class="content-card text-card" id="text-card">
+  <div class="section-heading compact"><span class="direction-icon">✎</span><div><p class="section-label">{{ t.text_label }}</p><h2>{{ t.text_title }}</h2></div></div>
+  <ul class="messages" id="messages"><li class="hint">{{ t.text_empty }}</li></ul>
+  <form class="text-form" id="text-form">
+    <textarea id="text-input" rows="3" maxlength="10000" placeholder="{{ t.text_placeholder }}" aria-label="{{ t.text_placeholder }}"></textarea>
+    <button type="submit"><span>{{ t.text_send }}</span><b aria-hidden="true">→</b></button>
+    <p class="hint text-status" id="text-status" role="status"></p>
+  </form>
+</section>
+<script>
+  (() => {
+    const textsUrl = {{ url_for('list_texts', token=token)|tojson }};
+    const textLabels = {{ {'from_pc': t.text_from_pc, 'from_phone': t.text_from_phone, 'copy': t.text_copy, 'copied': t.text_copied, 'copy_failed': t.text_copy_failed, 'empty': t.text_empty, 'too_long': t.text_too_long, 'failed': t.text_failed}|tojson }};
+    const list = document.querySelector('#messages');
+    const form = document.querySelector('#text-form');
+    const input = document.querySelector('#text-input');
+    const status = document.querySelector('#text-status');
+    let signature = '';
+    let stopped = false;
+
+    // Build the message with DOM nodes only: the text comes from the other device
+    // and must never be interpreted as HTML. Only http(s) URLs become links.
+    function appendLinkified(parent, text) {
+      const pattern = /https?:\/\/[^\s<>"']+/gi;
+      let last = 0;
+      for (const match of text.matchAll(pattern)) {
+        let url = match[0].replace(/[.,;:!?)\]}]+$/, '');
+        parent.append(document.createTextNode(text.slice(last, match.index)));
+        let safe = null;
+        try { const parsed = new URL(url); if (parsed.protocol === 'http:' || parsed.protocol === 'https:') safe = parsed.href; } catch (_) {}
+        if (safe) {
+          const link = document.createElement('a');
+          link.href = safe; link.textContent = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          parent.append(link);
+        } else {
+          parent.append(document.createTextNode(url));
+        }
+        last = match.index + url.length;
+      }
+      parent.append(document.createTextNode(text.slice(last)));
+    }
+
+    // The page runs on plain HTTP over the LAN, which is not a secure context, so
+    // navigator.clipboard is usually unavailable; execCommand('copy') still works there.
+    async function copyText(value) {
+      if (navigator.clipboard && window.isSecureContext) {
+        try { await navigator.clipboard.writeText(value); return true; } catch (_) {}
+      }
+      const area = document.createElement('textarea');
+      area.value = value; area.setAttribute('readonly', '');
+      area.style.position = 'fixed'; area.style.top = '0'; area.style.opacity = '0';
+      document.body.append(area);
+      area.focus(); area.select(); area.setSelectionRange(0, value.length);
+      let copied = false;
+      try { copied = document.execCommand('copy'); } catch (_) {}
+      area.remove();
+      return copied;
+    }
+
+    function render(messages) {
+      const next = messages.map(item => item.id).join(',');
+      if (next === signature) return;
+      signature = next;
+      list.replaceChildren();
+      if (!messages.length) {
+        const empty = document.createElement('li'); empty.className = 'hint'; empty.textContent = textLabels.empty;
+        list.append(empty); return;
+      }
+      for (const item of messages) {
+        const row = document.createElement('li');
+        row.className = item.from === 'pc' ? 'message from-pc' : 'message from-phone';
+        const meta = document.createElement('small');
+        const time = new Date(item.time * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        meta.textContent = `${item.from === 'pc' ? textLabels.from_pc : textLabels.from_phone} · ${time}`;
+        const body = document.createElement('p');
+        appendLinkified(body, item.text);
+        const copy = document.createElement('button');
+        copy.type = 'button'; copy.className = 'secondary copy-text'; copy.textContent = textLabels.copy;
+        copy.addEventListener('click', async () => {
+          const ok = await copyText(item.text);
+          copy.textContent = ok ? textLabels.copied : textLabels.copy;
+          if (!ok) status.textContent = textLabels.copy_failed;
+          setTimeout(() => { copy.textContent = textLabels.copy; }, 1800);
+        });
+        row.append(meta, body, copy);
+        list.append(row);
+      }
+      list.lastElementChild?.scrollIntoView({block: 'nearest'});
+    }
+
+    async function refresh() {
+      if (stopped) return;
+      try {
+        const response = await fetch(textsUrl, {cache: 'no-store'});
+        if (response.status === 410 || response.status === 403) { stopped = true; return; }
+        if (response.ok) render((await response.json()).messages);
+      } catch (_) {}
+      setTimeout(refresh, 1500);
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const text = input.value;
+      if (!text.trim()) return;
+      const button = form.querySelector('button');
+      button.disabled = true; status.textContent = '';
+      try {
+        const response = await fetch(textsUrl, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text}),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) { status.textContent = result.error === 'text_too_long' ? textLabels.too_long : textLabels.failed; return; }
+        input.value = '';
+        const listing = await fetch(textsUrl, {cache: 'no-store'});
+        if (listing.ok) render((await listing.json()).messages);
+      } catch (_) {
+        status.textContent = textLabels.failed;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    refresh();
+  })();
+</script>
