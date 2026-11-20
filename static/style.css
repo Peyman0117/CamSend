@@ -85,6 +85,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .status-pill i {
+  /* Without flex: none the dot shrinks to nothing on phones (pill has max-width there)
+     and only its box-shadow remains, which shows as a green bar. */
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;

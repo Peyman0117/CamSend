@@ -86,7 +86,9 @@
         row.append(meta, body, copy);
         list.append(row);
       }
-      list.lastElementChild?.scrollIntoView({block: 'nearest'});
+      // Scroll only the message list; scrollIntoView() would also scroll the page
+      // and push the upload card out of view whenever a message arrives.
+      list.scrollTop = list.scrollHeight;
     }
 
     async function refresh() {

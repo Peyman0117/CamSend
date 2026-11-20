@@ -1,4 +1,4 @@
-# Building CamSend 1.1.0 for Windows
+# Building CamSend 1.1.1 for Windows
 
 [Deutsch](#deutsch) · [English](#english)
 
@@ -38,8 +38,8 @@ Ergebnisse:
 
 ```text
 dist/CamSend/CamSend.exe
-release/CamSend-Portable-1.1.0.zip
-release/CamSend-Setup-1.1.0.exe
+release/CamSend-Portable-1.1.1.zip
+release/CamSend-Setup-1.1.1.exe
 release/SHA256SUMS.txt
 ```
 
@@ -100,8 +100,8 @@ Outputs:
 
 ```text
 dist/CamSend/CamSend.exe
-release/CamSend-Portable-1.1.0.zip
-release/CamSend-Setup-1.1.0.exe
+release/CamSend-Portable-1.1.1.zip
+release/CamSend-Setup-1.1.1.exe
 release/SHA256SUMS.txt
 ```
 

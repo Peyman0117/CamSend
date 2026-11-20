@@ -6,13 +6,15 @@
 
 [Download CamSend for Windows](https://github.com/Peyman0117/CamSend/releases) · [Deutsch](#deutsch) · [English](#english)
 
-> CamSend 1.1.0 uses local HTTP. Use it only on trusted private Wi-Fi or LAN networks.
+![CamSend: Windows-App und Smartphone-Browser](docs/screenshots/schritt-2-senden.png)
+
+> CamSend 1.1.1 uses local HTTP. Use it only on trusted private Wi-Fi or LAN networks.
 
 <a id="deutsch"></a>
 
 ## Deutsch
 
-CamSend Local 1.1.0 überträgt Dateien direkt zwischen einem Windows-PC und einem Smartphone oder Tablet im selben lokalen Netzwerk. Auf dem Mobilgerät muss nichts installiert werden: QR-Code scannen, Browser öffnen und Dateien senden oder empfangen.
+CamSend Local 1.1.1 überträgt Dateien direkt zwischen einem Windows-PC und einem Smartphone oder Tablet im selben lokalen Netzwerk. Auf dem Mobilgerät muss nichts installiert werden: QR-Code scannen, Browser öffnen und Dateien senden oder empfangen.
 
 ### Funktionen
 
@@ -32,8 +34,8 @@ CamSend Local 1.1.0 überträgt Dateien direkt zwischen einem Windows-PC und ein
 
 Die geprüften Windows-Pakete werden unter [GitHub Releases](https://github.com/Peyman0117/CamSend/releases) bereitgestellt:
 
-- `CamSend-Setup-1.1.0.exe` – empfohlener Installer mit Startmenü-Eintrag, optionaler Desktop-Verknüpfung und Deinstallation
-- `CamSend-Portable-1.1.0.zip` – portabler Ordner mit `CamSend.exe`
+- `CamSend-Setup-1.1.1.exe` – empfohlener Installer mit Startmenü-Eintrag, optionaler Desktop-Verknüpfung und Deinstallation
+- `CamSend-Portable-1.1.1.zip` – portabler Ordner mit `CamSend.exe`
 
 Für diese Pakete ist keine Python-Installation erforderlich. Vor der Veröffentlichung als stabiler Release müssen die realen Gerätetests aus [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) abgeschlossen sein.
 
@@ -57,7 +59,7 @@ Auf dem Smartphone steht der Bereich **Text & Links** bereit, sobald es verbunde
 
 Der Installer richtet auf Wunsch den Eintrag **Mit CamSend senden** ein. In der portablen Version wird er über das Sprachmenü (Globus-Symbol) → **Im Explorer-Rechtsklick anzeigen** ein- und ausgeschaltet. Unter Windows 11 erscheint er unter **Weitere Optionen anzeigen** (oder Umschalt+F10). Läuft CamSend bereits, wird die Datei an das offene Fenster übergeben; sonst startet CamSend mit der Datei und bietet sie an, sobald ein Smartphone verbunden ist.
 
-Ein noch nicht verwendeter QR-Code läuft nach 15 Minuten ab. Nach dem ersten erfolgreichen Pairing bleibt die Sitzung bestehen, bis sie beendet oder über **Neues Gerät verbinden** durch einen neuen QR-Code ersetzt wird. Version 1.1.0 erlaubt eine aktive Smartphone-Browser-Sitzung gleichzeitig.
+Ein noch nicht verwendeter QR-Code läuft nach 15 Minuten ab. Nach dem ersten erfolgreichen Pairing bleibt die Sitzung bestehen, bis sie beendet oder über **Neues Gerät verbinden** durch einen neuen QR-Code ersetzt wird. Version 1.1.1 erlaubt eine aktive Smartphone-Browser-Sitzung gleichzeitig.
 
 ### Dateiverarbeitung
 
@@ -71,7 +73,7 @@ Ein noch nicht verwendeter QR-Code läuft nach 15 Minuten ab. Nach dem ersten er
 
 ### Sicherheit und Datenschutz
 
-CamSend überträgt Dateien ausschließlich über das lokale Netzwerk und verwendet keine Cloud. Version 1.1.0 nutzt lokales HTTP mit einem kryptografisch zufälligen Sitzungstoken, besitzt aber noch keine TLS- oder Ende-zu-Ende-Verschlüsselung.
+CamSend überträgt Dateien ausschließlich über das lokale Netzwerk und verwendet keine Cloud. Version 1.1.1 nutzt lokales HTTP mit einem kryptografisch zufälligen Sitzungstoken, besitzt aber noch keine TLS- oder Ende-zu-Ende-Verschlüsselung.
 
 - Nur in einem vertrauenswürdigen privaten WLAN oder LAN verwenden.
 - Nicht für öffentliche oder gemeinsam genutzte WLAN-Netze empfohlen.
@@ -117,7 +119,37 @@ Alternativ `Start-CamSend.bat` starten. Der reproduzierbare Windows-Build ist in
 
 ### Screenshots
 
-Release-Screenshots werden nach der abschließenden Prüfung auf Windows 11, iPhone Safari und Android Chrome ergänzt.
+**Verbinden: QR-Code am PC scannen – das Smartphone braucht keine App**
+
+![Verbinden: QR-Code am PC scannen – das Smartphone braucht keine App](docs/screenshots/schritt-1-verbinden.png)
+
+**Senden: Dateien am PC auswählen und am Smartphone laden**
+
+![Senden: Dateien am PC auswählen und am Smartphone laden](docs/screenshots/schritt-2-senden.png)
+
+**Empfangen: Fotos und Videos vom Smartphone direkt in einen Windows-Ordner**
+
+![Empfangen: Fotos und Videos vom Smartphone direkt in einen Windows-Ordner](docs/screenshots/schritt-3-empfangen.png)
+
+**Text & Links: in beide Richtungen teilen, kopieren oder öffnen**
+
+![Text & Links: in beide Richtungen teilen, kopieren oder öffnen](docs/screenshots/schritt-4-text-links.png)
+
+<details><summary>Einzelne Screenshots</summary>
+
+<img src="docs/screenshots/windows-qr.png" alt="windows-qr" width="260">
+<img src="docs/screenshots/windows-verbunden.png" alt="windows-verbunden" width="260">
+<img src="docs/screenshots/windows-senden.png" alt="windows-senden" width="260">
+<img src="docs/screenshots/windows-empfangen.png" alt="windows-empfangen" width="260">
+<img src="docs/screenshots/windows-text-links.png" alt="windows-text-links" width="260">
+<img src="docs/screenshots/handy-verbunden.png" alt="handy-verbunden" width="260">
+<img src="docs/screenshots/handy-dateien-laden.png" alt="handy-dateien-laden" width="260">
+<img src="docs/screenshots/handy-dateien-senden.png" alt="handy-dateien-senden" width="260">
+<img src="docs/screenshots/handy-text-links.png" alt="handy-text-links" width="260">
+
+</details>
+
+_Aufgenommen mit CamSend 1.1.1 und Demo-Dateien._
 
 ### Projektstruktur
 
@@ -141,7 +173,7 @@ Der Softwarequellcode steht unter der [Mozilla Public License 2.0](LICENSE). Nam
 
 ## English
 
-CamSend Local 1.1.0 transfers files directly between a Windows PC and a smartphone or tablet on the same local network. Nothing needs to be installed on the mobile device: scan the QR code, open the browser, and send or receive files.
+CamSend Local 1.1.1 transfers files directly between a Windows PC and a smartphone or tablet on the same local network. Nothing needs to be installed on the mobile device: scan the QR code, open the browser, and send or receive files.
 
 ### Features
 
@@ -161,8 +193,8 @@ CamSend Local 1.1.0 transfers files directly between a Windows PC and a smartpho
 
 Validated Windows packages are published under [GitHub Releases](https://github.com/Peyman0117/CamSend/releases):
 
-- `CamSend-Setup-1.1.0.exe` – recommended installer with Start menu shortcut, optional desktop shortcut, and clean uninstallation
-- `CamSend-Portable-1.1.0.zip` – portable folder containing `CamSend.exe`
+- `CamSend-Setup-1.1.1.exe` – recommended installer with Start menu shortcut, optional desktop shortcut, and clean uninstallation
+- `CamSend-Portable-1.1.1.zip` – portable folder containing `CamSend.exe`
 
 These packages do not require Python. The real-device checks in [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) must pass before a stable release is published.
 
@@ -186,7 +218,7 @@ Once connected, the phone shows a **Text & links** card. On Windows, **Send text
 
 The installer can add the **Send with CamSend** entry. In the portable build, toggle it via the language menu (globe icon) → **Show in Explorer right-click menu**. On Windows 11 it appears under **Show more options** (or Shift+F10). If CamSend is already running, the file is handed to the open window; otherwise CamSend starts with the file and offers it as soon as a phone connects.
 
-An unused QR code expires after 15 minutes. After the first successful pairing, the session remains valid until it is ended or replaced through **Connect new device**. Version 1.1.0 permits one active smartphone browser session at a time.
+An unused QR code expires after 15 minutes. After the first successful pairing, the session remains valid until it is ended or replaced through **Connect new device**. Version 1.1.1 permits one active smartphone browser session at a time.
 
 ### File handling
 
@@ -200,7 +232,7 @@ An unused QR code expires after 15 minutes. After the first successful pairing, 
 
 ### Security and privacy
 
-CamSend transfers files only over the local network and does not use cloud storage. Version 1.1.0 uses local HTTP with a cryptographically random session token, but it does not yet provide TLS or end-to-end encryption.
+CamSend transfers files only over the local network and does not use cloud storage. Version 1.1.1 uses local HTTP with a cryptographically random session token, but it does not yet provide TLS or end-to-end encryption.
 
 - Use CamSend only on a trusted private Wi-Fi or LAN.
 - Public or shared Wi-Fi networks are not recommended.
@@ -246,7 +278,37 @@ You can alternatively launch `Start-CamSend.bat`. See [BUILDING.md](BUILDING.md)
 
 ### Screenshots
 
-Release screenshots will be added after final validation on Windows 11, iPhone Safari, and Android Chrome.
+**Connect: scan the QR code on the PC – no app needed on the phone**
+
+![Connect: scan the QR code on the PC – no app needed on the phone](docs/screenshots/schritt-1-verbinden.png)
+
+**Send: pick files on the PC and download them on the phone**
+
+![Send: pick files on the PC and download them on the phone](docs/screenshots/schritt-2-senden.png)
+
+**Receive: photos and videos from the phone straight into a Windows folder**
+
+![Receive: photos and videos from the phone straight into a Windows folder](docs/screenshots/schritt-3-empfangen.png)
+
+**Text & links: share in both directions, copy or open**
+
+![Text & links: share in both directions, copy or open](docs/screenshots/schritt-4-text-links.png)
+
+<details><summary>Individual screenshots</summary>
+
+<img src="docs/screenshots/windows-qr.png" alt="windows-qr" width="260">
+<img src="docs/screenshots/windows-verbunden.png" alt="windows-verbunden" width="260">
+<img src="docs/screenshots/windows-senden.png" alt="windows-senden" width="260">
+<img src="docs/screenshots/windows-empfangen.png" alt="windows-empfangen" width="260">
+<img src="docs/screenshots/windows-text-links.png" alt="windows-text-links" width="260">
+<img src="docs/screenshots/handy-verbunden.png" alt="handy-verbunden" width="260">
+<img src="docs/screenshots/handy-dateien-laden.png" alt="handy-dateien-laden" width="260">
+<img src="docs/screenshots/handy-dateien-senden.png" alt="handy-dateien-senden" width="260">
+<img src="docs/screenshots/handy-text-links.png" alt="handy-text-links" width="260">
+
+</details>
+
+_Captured with CamSend 1.1.1 and demo files._
 
 ### Project structure
 

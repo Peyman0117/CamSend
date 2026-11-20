@@ -36,7 +36,7 @@ class CamSendReleaseTests(unittest.TestCase):
         )
 
     def test_release_version_and_request_limit(self) -> None:
-        self.assertEqual(VERSION, "1.1.0")
+        self.assertEqual(VERSION, "1.1.1")
         self.assertEqual(app.MAX_FILE_BYTES, 2 * 1024 * 1024 * 1024)
         self.assertEqual(app.app.config["MAX_CONTENT_LENGTH"], app.MAX_FILE_BYTES)
 
@@ -386,6 +386,23 @@ class CamSendReleaseTests(unittest.TestCase):
         import shell_integration
         self.assertEqual(shell_integration.command_for(r"C:\Apps\CamSend\CamSend.exe"),
                          r'"C:\Apps\CamSend\CamSend.exe" --send "%1"')
+
+    def test_long_window_headings_are_shrunk_to_fit(self) -> None:
+        import tkinter
+        try:
+            root = tkinter.Tk()
+        except tkinter.TclError:
+            self.skipTest("no display available for Tk")
+        try:
+            from tkinter import font as tkfont
+            for words in windows_app.WORDS.values():
+                for key in ("connect", "connected", "receiving", "sending", "ended", "start"):
+                    family, size, weight = windows_app.CamSendWindow._heading_font(words[key])
+                    width = tkfont.Font(family=family, size=size, weight=weight).measure(words[key])
+                    self.assertTrue(width <= windows_app.HEADING_MAX_WIDTH or size == 16, (words[key], size, width))
+            self.assertEqual(windows_app.CamSendWindow._heading_font("Kurz")[1], 24)
+        finally:
+            root.destroy()
 
 
 if __name__ == "__main__":

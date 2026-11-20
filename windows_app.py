@@ -18,6 +18,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from tkinter import filedialog, messagebox
+from tkinter import font as tkfont
 from urllib.parse import urlparse
 
 import qrcode
@@ -196,6 +197,7 @@ for _language, _words in WORDS_1_1.items():
 
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "English", "tr": "Türkçe", "az": "Azərbaycan", "ru": "Русский"}
 URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+HEADING_MAX_WIDTH = 385  # usable width inside the fixed 480 px window
 HANDOFF_TIMEOUT_SECONDS = 2.0
 HANDOFF_RETRY_SECONDS = 6.0
 
@@ -343,10 +345,20 @@ class CamSendWindow:
         )
         language_button.pack(side="right")
         tk.Label(self.body, text=heading, bg=PANEL, fg=TEXT,
-                 anchor="w", justify="left", font=("Segoe UI", 24, "bold")).pack(fill="x", pady=(0, 6))
+                 anchor="w", justify="left", font=self._heading_font(heading)).pack(fill="x", pady=(0, 6))
         if subtext:
             tk.Label(self.body, text=subtext, bg=PANEL, fg=MUTED, wraplength=385,
                      anchor="w", justify="left", font=("Segoe UI", 10)).pack(fill="x")
+
+    @staticmethod
+    def _heading_font(heading, max_width=HEADING_MAX_WIDTH):
+        # The window has a fixed width; long headings such as "Empfangen vom
+        # Smartphone" were clipped at 24 pt. Shrinking keeps the layout height
+        # unchanged, which wrapping would not (the progress view has no spare room).
+        size = 24
+        while size > 16 and tkfont.Font(family="Segoe UI", size=size, weight="bold").measure(heading) > max_width:
+            size -= 1
+        return ("Segoe UI", size, "bold")
 
     def tr(self, key):
         return WORDS[self.language][key]
